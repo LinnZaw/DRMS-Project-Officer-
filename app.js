@@ -9,8 +9,6 @@ const spaViews = document.querySelectorAll('.spa-view');
 const defaultOverview = document.getElementById('defaultOverview');
 const stockBalanceListView = document.getElementById('stockBalanceListView');
 const stockBalanceDetailView = document.getElementById('stockBalanceDetailView');
-const placeholderView = document.getElementById('placeholderView');
-const placeholderTitle = document.getElementById('placeholderTitle');
 
 const reportCards = document.getElementById('reportCards');
 const reportsState = document.getElementById('reportsState');
@@ -19,10 +17,7 @@ const detailContainer = document.getElementById('detailContainer');
 const itemsTableBody = document.getElementById('itemsTableBody');
 const backToReportsBtn = document.getElementById('backToReportsBtn');
 
-const demoCredentials = {
-  email: 'officer@drms.org',
-  password: 'password123'
-};
+const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
 
 const formatDate = (value) =>
   new Date(value).toLocaleString('en-GB', {
@@ -40,12 +35,7 @@ const showView = (view) => {
 
 const setActiveSidebar = (routeKey) => {
   sidebarNavLinks.forEach((link) => {
-    if (link.dataset.route === routeKey) {
-      link.classList.add('active');
-      return;
-    }
-
-    link.classList.remove('active');
+    link.classList.toggle('active', link.dataset.route === routeKey);
   });
 };
 
@@ -57,21 +47,19 @@ const renderReportCard = (report) => {
 
   card.innerHTML = `
     <div class="row align-items-center g-3">
-      <div class="col-md-3">
+      <div class="col-4">
         <p class="small text-muted mb-1">Report ID</p>
         <p class="mb-0 fw-semibold theme-text">${report.reportId}</p>
       </div>
-      <div class="col-md-4">
+      <div class="col-4">
         <p class="small text-muted mb-1">Logistic Officer Name</p>
         <p class="mb-0">${report.logisticOfficerName}</p>
       </div>
-      <div class="col-md-4">
+      <div class="col-3">
         <p class="small text-muted mb-1">Reported Date</p>
         <p class="mb-0">${formatDate(report.reportedDate)}</p>
       </div>
-      <div class="col-md-1 text-md-end">
-        <span class="text-muted">›</span>
-      </div>
+      <div class="col-1 text-end text-muted">›</div>
     </div>
   `;
 
@@ -104,42 +92,16 @@ const renderReportsList = async () => {
     }
 
     reports.forEach((report) => reportCards.appendChild(renderReportCard(report)));
-  } catch (error) {
+  } catch {
     reportsState.textContent = 'Unable to load reports. Please try again later.';
     reportsState.classList.remove('d-none');
   }
 };
 
-const resetDetailState = () => {
+const loadReportDetail = async (reportId) => {
   detailError.classList.add('d-none');
   detailContainer.classList.add('d-none');
   itemsTableBody.innerHTML = '';
-};
-
-const renderDetail = (report) => {
-  document.getElementById('reportId').textContent = report.reportId;
-  document.getElementById('officerName').textContent = report.logisticOfficerName;
-  document.getElementById('reportedDate').textContent = formatDate(report.reportedDate);
-  document.getElementById('warehouseName').textContent = report.warehouseName || 'N/A';
-  document.getElementById('totalItemTypes').textContent = report.items.length;
-  document.getElementById('generatedTimestamp').textContent = formatDate(report.generatedTimestamp);
-
-  report.items.forEach((item) => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${item.itemName}</td>
-      <td>${item.category}</td>
-      <td>${item.quantityAvailable}</td>
-      <td>${item.unit}</td>
-    `;
-    itemsTableBody.appendChild(row);
-  });
-
-  detailContainer.classList.remove('d-none');
-};
-
-const loadReportDetail = async (reportId) => {
-  resetDetailState();
 
   if (!reportId) {
     detailError.textContent = 'Invalid report ID. Please select a valid stock balance report.';
@@ -149,7 +111,21 @@ const loadReportDetail = async (reportId) => {
 
   try {
     const report = await fetchStockBalanceReportById(reportId);
-    renderDetail(report);
+
+    document.getElementById('reportId').textContent = report.reportId;
+    document.getElementById('officerName').textContent = report.logisticOfficerName;
+    document.getElementById('reportedDate').textContent = formatDate(report.reportedDate);
+    document.getElementById('warehouseName').textContent = report.warehouseName || 'N/A';
+    document.getElementById('totalItemTypes').textContent = report.items.length;
+    document.getElementById('generatedTimestamp').textContent = formatDate(report.generatedTimestamp);
+
+    report.items.forEach((item) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${item.itemName}</td><td>${item.category}</td><td>${item.quantityAvailable}</td><td>${item.unit}</td>`;
+      itemsTableBody.appendChild(row);
+    });
+
+    detailContainer.classList.remove('d-none');
   } catch (error) {
     detailError.textContent =
       error.message === 'invalid_report_id'
@@ -162,12 +138,6 @@ const loadReportDetail = async (reportId) => {
 const renderRoute = async () => {
   const hash = window.location.hash || '#/dashboard';
 
-  if (hash === '#/dashboard') {
-    setActiveSidebar('');
-    showView(defaultOverview);
-    return;
-  }
-
   if (hash === '#/stock-balance') {
     setActiveSidebar('stock-balance');
     showView(stockBalanceListView);
@@ -178,47 +148,25 @@ const renderRoute = async () => {
   if (hash.startsWith('#/stock-balance/')) {
     setActiveSidebar('stock-balance');
     showView(stockBalanceDetailView);
-    const reportId = decodeURIComponent(hash.replace('#/stock-balance/', ''));
-    await loadReportDetail(reportId);
+    await loadReportDetail(decodeURIComponent(hash.replace('#/stock-balance/', '')));
     return;
   }
 
-  if (hash === '#/assign-distribution' || hash === '#/manage-beneficiary' || hash === '#/distribution-report') {
-    const routeKey = hash.replace('#/', '');
-    const titleMap = {
-      'assign-distribution': 'Assign Distribution',
-      'manage-beneficiary': 'Manage Beneficiary Data',
-      'distribution-report': 'Distribution Report'
-    };
-
-    setActiveSidebar(routeKey);
-    placeholderTitle.textContent = titleMap[routeKey];
-    showView(placeholderView);
-    return;
-  }
-
-  window.location.hash = '#/dashboard';
+  setActiveSidebar('');
+  showView(defaultOverview);
 };
 
 const showDashboard = () => {
   loginPage.classList.add('d-none');
   homePage.classList.remove('d-none');
-  homePage.classList.add('page-transition');
   if (!window.location.hash) {
     window.location.hash = '#/dashboard';
   }
   renderRoute();
 };
 
-const showLogin = () => {
-  homePage.classList.add('d-none');
-  loginPage.classList.remove('d-none');
-  loginPage.classList.add('page-transition');
-};
-
 loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
-
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
 
@@ -230,13 +178,6 @@ loginForm.addEventListener('submit', (event) => {
 
   errorMessage.textContent = 'Invalid email or password. Try officer@drms.org / password123';
   errorMessage.classList.remove('d-none');
-});
-
-sidebarNavLinks.forEach((link) => {
-  link.addEventListener('click', () => {
-    sidebarNavLinks.forEach((item) => item.classList.remove('active'));
-    link.classList.add('active');
-  });
 });
 
 backToReportsBtn.addEventListener('click', () => {
@@ -251,6 +192,7 @@ window.addEventListener('hashchange', () => {
 
 logoutBtn.addEventListener('click', () => {
   loginForm.reset();
+  homePage.classList.add('d-none');
+  loginPage.classList.remove('d-none');
   window.location.hash = '#/dashboard';
-  showLogin();
 });

@@ -16,6 +16,7 @@ body {
   display: grid;
   place-items: center;
   background: radial-gradient(circle at top right, #f5f8ff 0%, #e6eefc 45%, #dce7fb 100%);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .app-frame {
@@ -23,22 +24,19 @@ body {
   height: 820px;
 }
 
-.login-page,
-.login-shell {
+.login-page {
   height: 100%;
+  display: grid;
+  place-items: center;
 }
 
-.dashboard-shell {
-  border-radius: 1rem;
+.login-card {
+  width: 430px;
+  border-radius: 14px;
 }
 
 .theme-text {
   color: var(--drms-primary);
-}
-
-.login-banner,
-.sidebar-nav {
-  background: linear-gradient(165deg, var(--drms-primary-dark), var(--drms-primary));
 }
 
 .btn-theme {
@@ -53,13 +51,25 @@ body {
   background: linear-gradient(120deg, #2f4f84, var(--drms-primary-dark));
 }
 
+.form-control {
+  border-radius: 10px;
+}
+
 .form-control:focus {
   border-color: var(--drms-primary);
   box-shadow: 0 0 0 0.2rem rgba(72, 114, 183, 0.2);
 }
 
+.dashboard-shell {
+  border-radius: 14px;
+}
+
+.sidebar-nav {
+  background: linear-gradient(165deg, var(--drms-primary-dark), var(--drms-primary));
+}
+
 .sidebar-nav .nav-link {
-  border-radius: 0.6rem;
+  border-radius: 8px;
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
@@ -67,11 +77,6 @@ body {
 .sidebar-nav .nav-link.active {
   background-color: rgba(255, 255, 255, 0.2);
   transform: translateX(3px);
-}
-
-.dashboard-header {
-  flex: 0 0 auto;
-  background: #fff;
 }
 
 .dashboard-content-scroll {
@@ -92,7 +97,7 @@ body {
   background-color: #fff;
   border: 1px solid #cfdbf1;
   box-shadow: 0 8px 24px rgba(54, 92, 152, 0.08);
-  border-radius: 0.9rem;
+  border-radius: 12px;
 }
 
 .status-badge {
@@ -104,6 +109,11 @@ body {
   padding: 0.35rem 0.7rem;
 }
 
+#reportCards {
+  width: 100%;
+  gap: 14px;
+}
+
 .report-row {
   width: 100%;
   cursor: pointer;
@@ -112,18 +122,9 @@ body {
 
 .report-row:hover,
 .report-row:focus {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 24px rgba(54, 92, 152, 0.16);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(54, 92, 152, 0.16);
   outline: none;
-}
-
-#reportCards {
-  width: 100%;
-  gap: 14px !important;
-}
-
-#reportCards .report-card {
-  width: 100%;
 }
 
 .dashboard-content-scroll::-webkit-scrollbar {
@@ -147,19 +148,4 @@ body {
 .dashboard-content-scroll {
   scrollbar-width: thin;
   scrollbar-color: #b8c9ea #e9effb;
-}
-
-.page-transition {
-  animation: fadeSlideIn 0.45s ease both;
-}
-
-@keyframes fadeSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }

@@ -14,55 +14,43 @@
   </head>
   <body>
     <main class="app-frame">
-      <section id="loginPage" class="login-page page-transition">
-        <div class="card shadow-lg border-0 login-shell overflow-hidden">
-          <div class="row g-0 h-100">
-            <div class="col-5 login-banner d-flex flex-column justify-content-between p-4 text-white">
-              <div>
-                <h2 class="h5 fw-semibold mb-2">DRMS Portal</h2>
-                <p class="small mb-0 opacity-75">Project Officer Access</p>
+      <section id="loginPage" class="login-page">
+        <div class="login-card card border-0 shadow-sm">
+          <div class="card-body p-4">
+            <h1 class="h4 text-center theme-text mb-2">Project Officer Login</h1>
+            <p class="text-muted text-center mb-4">Disaster Release Management System</p>
+
+            <form id="loginForm" novalidate>
+              <div class="mb-3">
+                <label for="email" class="form-label">Email address</label>
+                <input type="email" id="email" class="form-control" placeholder="officer@drms.org" required />
               </div>
-              <p class="small mb-0 opacity-75">Securely coordinate stock, beneficiaries, and distribution reports.</p>
-            </div>
-            <div class="col-7">
-              <div class="card-body p-5">
-                <h1 class="h3 theme-text mb-2">Welcome Back</h1>
-                <p class="text-muted mb-4">Sign in to continue to your dashboard.</p>
 
-                <form id="loginForm" novalidate>
-                  <div class="mb-3">
-                    <label for="email" class="form-label">Email address</label>
-                    <input type="email" id="email" class="form-control" placeholder="officer@drms.org" required />
-                  </div>
-
-                  <div class="mb-3">
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" id="password" class="form-control" placeholder="Enter your password" required />
-                  </div>
-
-                  <div id="errorMessage" class="alert alert-danger py-2 d-none" role="alert"></div>
-
-                  <button type="submit" class="btn btn-theme w-100 mt-2">Login</button>
-                  <p class="text-muted small mt-3 mb-0">Demo credentials: officer@drms.org / password123</p>
-                </form>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" class="form-control" placeholder="Enter your password" required />
               </div>
-            </div>
+
+              <div id="errorMessage" class="alert alert-danger py-2 d-none" role="alert"></div>
+
+              <button type="submit" class="btn btn-theme w-100">Login</button>
+            </form>
           </div>
         </div>
       </section>
 
-      <section id="homePage" class="d-none page-transition h-100">
-        <div class="card shadow border-0 overflow-hidden dashboard-shell h-100">
+      <section id="homePage" class="d-none h-100">
+        <div class="card border-0 shadow-sm dashboard-shell h-100 overflow-hidden">
           <div class="row g-0 h-100">
             <aside class="col-3 sidebar-nav p-4 d-flex flex-column">
               <h3 class="h5 text-white fw-semibold mb-1">Project Officer Panel</h3>
               <p class="small text-white-50 mb-4">Disaster Release Management System</p>
 
-              <nav id="sidebarNav" class="nav nav-pills flex-column gap-2 mb-4">
+              <nav id="sidebarNav" class="nav nav-pills flex-column gap-2">
                 <a class="nav-link text-white" data-route="stock-balance" href="#/stock-balance">Stock Balance</a>
-                <a class="nav-link text-white" data-route="assign-distribution" href="#/assign-distribution">Assign Distribution</a>
-                <a class="nav-link text-white" data-route="manage-beneficiary" href="#/manage-beneficiary">Manage Beneficiary Data</a>
-                <a class="nav-link text-white" data-route="distribution-report" href="#/distribution-report">Distribution Report</a>
+                <a class="nav-link text-white" href="#/dashboard">Assign Distribution</a>
+                <a class="nav-link text-white" href="#/dashboard">Manage Beneficiary Data</a>
+                <a class="nav-link text-white" href="#/dashboard">Distribution Report</a>
               </nav>
 
               <button id="logoutBtn" class="btn btn-light btn-sm theme-text fw-semibold mt-auto">Logout</button>
@@ -70,9 +58,9 @@
 
             <div class="col-9 d-flex flex-column">
               <div class="dashboard-header px-4 py-3 border-bottom">
-                <div class="d-flex justify-content-between align-items-start gap-3">
+                <div class="d-flex justify-content-between align-items-center">
                   <div>
-                    <h2 class="theme-text h4 mb-1">Project Officer Dashboard</h2>
+                    <h2 class="h4 theme-text mb-1">Project Officer Dashboard</h2>
                     <p class="mb-0 text-muted">Monitor relief operations in one place.</p>
                   </div>
                   <span class="status-badge">Live Status</span>
@@ -81,15 +69,9 @@
 
               <div class="dashboard-content-scroll p-4">
                 <section id="defaultOverview" class="spa-view">
-                  <div class="organization-card rounded-3 p-4 mb-4 section-animate">
+                  <div class="organization-card rounded-3 p-4">
                     <h3 class="h5 mb-2">Organization Name</h3>
-                    <p class="fs-4 fw-semibold mb-0">Disaster Relief Management Organization</p>
-                  </div>
-
-                  <div class="row g-3 mb-4">
-                    <div class="col-4"><div class="metric-card p-3 rounded-3"><p class="small text-muted mb-1">Total Stock Units</p><h4 class="mb-0">12,480</h4></div></div>
-                    <div class="col-4"><div class="metric-card p-3 rounded-3"><p class="small text-muted mb-1">Active Beneficiaries</p><h4 class="mb-0">3,125</h4></div></div>
-                    <div class="col-4"><div class="metric-card p-3 rounded-3"><p class="small text-muted mb-1">Today Distributions</p><h4 class="mb-0">42</h4></div></div>
+                    <p class="fs-5 fw-semibold mb-0">Disaster Relief Management Organization</p>
                   </div>
                 </section>
 
@@ -99,7 +81,7 @@
                     <span class="small text-muted">Latest first</span>
                   </div>
                   <div id="reportsState" class="alert alert-info d-none"></div>
-                  <div id="reportCards" class="d-grid gap-3"></div>
+                  <div id="reportCards" class="d-grid"></div>
                 </section>
 
                 <section id="stockBalanceDetailView" class="spa-view d-none">
@@ -107,7 +89,9 @@
                     <h3 class="h5 theme-text mb-0">Stock Balance Report Detail</h3>
                     <button id="backToReportsBtn" class="btn btn-outline-primary btn-sm">Back to Reports</button>
                   </div>
+
                   <div id="detailError" class="alert alert-danger d-none"></div>
+
                   <div id="detailContainer" class="card border-0 shadow-sm d-none">
                     <div class="card-body p-4">
                       <div class="row g-3 mb-3">
@@ -118,21 +102,22 @@
                         <div class="col-6"><strong>Total Item Types:</strong> <span id="totalItemTypes"></span></div>
                         <div class="col-6"><strong>Generated Timestamp:</strong> <span id="generatedTimestamp"></span></div>
                       </div>
+
                       <h4 class="h6 theme-text">Items</h4>
                       <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0">
-                          <thead><tr><th>Item Name</th><th>Category</th><th>Quantity Available</th><th>Unit</th></tr></thead>
+                          <thead>
+                            <tr>
+                              <th>Item Name</th>
+                              <th>Category</th>
+                              <th>Quantity Available</th>
+                              <th>Unit</th>
+                            </tr>
+                          </thead>
                           <tbody id="itemsTableBody"></tbody>
                         </table>
                       </div>
                     </div>
-                  </div>
-                </section>
-
-                <section id="placeholderView" class="spa-view d-none">
-                  <div class="feature-card p-4 rounded-3">
-                    <h3 id="placeholderTitle" class="h6 theme-text">Module</h3>
-                    <p class="mb-0 text-muted">This module is ready for next implementation phase.</p>
                   </div>
                 </section>
               </div>
