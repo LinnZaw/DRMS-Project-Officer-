@@ -13,50 +13,48 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="container py-5">
-      <section id="loginPage" class="row justify-content-center page-transition">
-        <div class="col-12 col-md-8 col-lg-6">
-          <div class="card shadow-lg border-0 login-shell overflow-hidden">
-            <div class="row g-0">
-              <div class="col-md-5 login-banner d-none d-md-flex flex-column justify-content-between p-4 text-white">
-                <div>
-                  <h2 class="h5 fw-semibold mb-2">DRMS Portal</h2>
-                  <p class="small mb-0 opacity-75">Project Officer Access</p>
-                </div>
-                <p class="small mb-0 opacity-75">Securely coordinate stock, beneficiaries, and distribution reports.</p>
+    <main class="app-frame">
+      <section id="loginPage" class="login-page page-transition">
+        <div class="card shadow-lg border-0 login-shell overflow-hidden">
+          <div class="row g-0 h-100">
+            <div class="col-5 login-banner d-flex flex-column justify-content-between p-4 text-white">
+              <div>
+                <h2 class="h5 fw-semibold mb-2">DRMS Portal</h2>
+                <p class="small mb-0 opacity-75">Project Officer Access</p>
               </div>
-              <div class="col-12 col-md-7">
-                <div class="card-body p-4 p-md-5">
-                  <h1 class="h3 theme-text mb-2">Welcome Back</h1>
-                  <p class="text-muted mb-4">Sign in to continue to your dashboard.</p>
+              <p class="small mb-0 opacity-75">Securely coordinate stock, beneficiaries, and distribution reports.</p>
+            </div>
+            <div class="col-7">
+              <div class="card-body p-5">
+                <h1 class="h3 theme-text mb-2">Welcome Back</h1>
+                <p class="text-muted mb-4">Sign in to continue to your dashboard.</p>
 
-                  <form id="loginForm" novalidate>
-                    <div class="mb-3">
-                      <label for="email" class="form-label">Email address</label>
-                      <input type="email" id="email" class="form-control" placeholder="officer@drms.org" required />
-                    </div>
+                <form id="loginForm" novalidate>
+                  <div class="mb-3">
+                    <label for="email" class="form-label">Email address</label>
+                    <input type="email" id="email" class="form-control" placeholder="officer@drms.org" required />
+                  </div>
 
-                    <div class="mb-3">
-                      <label for="password" class="form-label">Password</label>
-                      <input type="password" id="password" class="form-control" placeholder="Enter your password" required />
-                    </div>
+                  <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" class="form-control" placeholder="Enter your password" required />
+                  </div>
 
-                    <div id="errorMessage" class="alert alert-danger py-2 d-none" role="alert"></div>
+                  <div id="errorMessage" class="alert alert-danger py-2 d-none" role="alert"></div>
 
-                    <button type="submit" class="btn btn-theme w-100 mt-2">Login</button>
-                    <p class="text-muted small mt-3 mb-0">Demo credentials: officer@drms.org / password123</p>
-                  </form>
-                </div>
+                  <button type="submit" class="btn btn-theme w-100 mt-2">Login</button>
+                  <p class="text-muted small mt-3 mb-0">Demo credentials: officer@drms.org / password123</p>
+                </form>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="homePage" class="d-none page-transition">
-        <div class="card shadow border-0 overflow-hidden dashboard-shell">
-          <div class="row g-0">
-            <aside class="col-12 col-lg-3 sidebar-nav p-3 p-lg-4">
+      <section id="homePage" class="d-none page-transition h-100">
+        <div class="card shadow border-0 overflow-hidden dashboard-shell h-100">
+          <div class="row g-0 h-100">
+            <aside class="col-3 sidebar-nav p-4 d-flex flex-column">
               <h3 class="h5 text-white fw-semibold mb-1">Project Officer Panel</h3>
               <p class="small text-white-50 mb-4">Disaster Release Management System</p>
 
@@ -67,19 +65,21 @@
                 <a class="nav-link text-white" data-route="distribution-report" href="#/distribution-report">Distribution Report</a>
               </nav>
 
-              <button id="logoutBtn" class="btn btn-light btn-sm theme-text fw-semibold">Logout</button>
+              <button id="logoutBtn" class="btn btn-light btn-sm theme-text fw-semibold mt-auto">Logout</button>
             </aside>
 
-            <div class="col-12 col-lg-9">
-              <div class="card-body p-4 p-md-5">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+            <div class="col-9 d-flex flex-column">
+              <div class="dashboard-header px-4 py-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-start gap-3">
                   <div>
-                    <h2 class="theme-text mb-1">Project Officer Dashboard</h2>
+                    <h2 class="theme-text h4 mb-1">Project Officer Dashboard</h2>
                     <p class="mb-0 text-muted">Monitor relief operations in one place.</p>
                   </div>
                   <span class="status-badge">Live Status</span>
                 </div>
+              </div>
 
+              <div class="dashboard-content-scroll p-4">
                 <section id="defaultOverview" class="spa-view">
                   <div class="organization-card rounded-3 p-4 mb-4 section-animate">
                     <h3 class="h5 mb-2">Organization Name</h3>
@@ -87,24 +87,9 @@
                   </div>
 
                   <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-4">
-                      <div class="metric-card p-3 rounded-3 section-animate">
-                        <p class="small text-muted mb-1">Total Stock Units</p>
-                        <h4 class="mb-0">12,480</h4>
-                      </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                      <div class="metric-card p-3 rounded-3 section-animate">
-                        <p class="small text-muted mb-1">Active Beneficiaries</p>
-                        <h4 class="mb-0">3,125</h4>
-                      </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                      <div class="metric-card p-3 rounded-3 section-animate">
-                        <p class="small text-muted mb-1">Today Distributions</p>
-                        <h4 class="mb-0">42</h4>
-                      </div>
-                    </div>
+                    <div class="col-4"><div class="metric-card p-3 rounded-3"><p class="small text-muted mb-1">Total Stock Units</p><h4 class="mb-0">12,480</h4></div></div>
+                    <div class="col-4"><div class="metric-card p-3 rounded-3"><p class="small text-muted mb-1">Active Beneficiaries</p><h4 class="mb-0">3,125</h4></div></div>
+                    <div class="col-4"><div class="metric-card p-3 rounded-3"><p class="small text-muted mb-1">Today Distributions</p><h4 class="mb-0">42</h4></div></div>
                   </div>
                 </section>
 
@@ -126,24 +111,17 @@
                   <div id="detailContainer" class="card border-0 shadow-sm d-none">
                     <div class="card-body p-4">
                       <div class="row g-3 mb-3">
-                        <div class="col-md-6"><strong>Report ID:</strong> <span id="reportId"></span></div>
-                        <div class="col-md-6"><strong>Logistic Officer Name:</strong> <span id="officerName"></span></div>
-                        <div class="col-md-6"><strong>Reported Date:</strong> <span id="reportedDate"></span></div>
-                        <div class="col-md-6"><strong>Warehouse Name:</strong> <span id="warehouseName"></span></div>
-                        <div class="col-md-6"><strong>Total Item Types:</strong> <span id="totalItemTypes"></span></div>
-                        <div class="col-md-6"><strong>Generated Timestamp:</strong> <span id="generatedTimestamp"></span></div>
+                        <div class="col-6"><strong>Report ID:</strong> <span id="reportId"></span></div>
+                        <div class="col-6"><strong>Logistic Officer Name:</strong> <span id="officerName"></span></div>
+                        <div class="col-6"><strong>Reported Date:</strong> <span id="reportedDate"></span></div>
+                        <div class="col-6"><strong>Warehouse Name:</strong> <span id="warehouseName"></span></div>
+                        <div class="col-6"><strong>Total Item Types:</strong> <span id="totalItemTypes"></span></div>
+                        <div class="col-6"><strong>Generated Timestamp:</strong> <span id="generatedTimestamp"></span></div>
                       </div>
                       <h4 class="h6 theme-text">Items</h4>
                       <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0">
-                          <thead>
-                            <tr>
-                              <th>Item Name</th>
-                              <th>Category</th>
-                              <th>Quantity Available</th>
-                              <th>Unit</th>
-                            </tr>
-                          </thead>
+                          <thead><tr><th>Item Name</th><th>Category</th><th>Quantity Available</th><th>Unit</th></tr></thead>
                           <tbody id="itemsTableBody"></tbody>
                         </table>
                       </div>
