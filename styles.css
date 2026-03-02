@@ -149,3 +149,18 @@ body {
     box-shadow: 0 0 0 10px rgba(72, 114, 183, 0);
   }
 }
+
+.report-card {
+  border: 1px solid #cfdbf1;
+  border-radius: 0.9rem;
+  background: #ffffff;
+  box-shadow: 0 6px 20px rgba(54, 92, 152, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-card:hover,
+.report-card:focus {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(54, 92, 152, 0.16);
+  outline: none;
+}

@@ -40,12 +40,16 @@ loginForm.addEventListener('submit', (event) => {
 
 sidebarNavLinks.forEach((link) => {
   link.addEventListener('click', (event) => {
-    event.preventDefault();
+    const targetId = link.getAttribute('data-target');
 
+    if (!targetId) {
+      return;
+    }
+
+    event.preventDefault();
     sidebarNavLinks.forEach((item) => item.classList.remove('active'));
     link.classList.add('active');
 
-    const targetId = link.getAttribute('data-target');
     const targetSection = document.getElementById(targetId);
 
     if (targetSection) {
