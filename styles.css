@@ -164,3 +164,15 @@ body {
   box-shadow: 0 12px 24px rgba(54, 92, 152, 0.16);
   outline: none;
 }
+
+.report-row {
+  width: 100%;
+}
+
+#reportCards {
+  width: 100%;
+}
+
+#reportCards .report-card {
+  width: 100%;
+}

@@ -61,10 +61,10 @@
               <p class="small text-white-50 mb-4">Disaster Release Management System</p>
 
               <nav id="sidebarNav" class="nav nav-pills flex-column gap-2 mb-4">
-                <a class="nav-link text-white active" href="stock-balance.html">Stock Balance</a>
-                <a class="nav-link text-white" data-target="assignDistribution" href="#assignDistribution">Assign Distribution</a>
-                <a class="nav-link text-white" data-target="manageBeneficiaryData" href="#manageBeneficiaryData">Manage Beneficiary Data</a>
-                <a class="nav-link text-white" data-target="distributionReport" href="#distributionReport">Distribution Report</a>
+                <a class="nav-link text-white" data-route="stock-balance" href="#/stock-balance">Stock Balance</a>
+                <a class="nav-link text-white" data-route="assign-distribution" href="#/assign-distribution">Assign Distribution</a>
+                <a class="nav-link text-white" data-route="manage-beneficiary" href="#/manage-beneficiary">Manage Beneficiary Data</a>
+                <a class="nav-link text-white" data-route="distribution-report" href="#/distribution-report">Distribution Report</a>
               </nav>
 
               <button id="logoutBtn" class="btn btn-light btn-sm theme-text fw-semibold">Logout</button>
@@ -80,62 +80,83 @@
                   <span class="status-badge">Live Status</span>
                 </div>
 
-                <div class="organization-card rounded-3 p-4 mb-4 section-animate">
-                  <h3 class="h5 mb-2">Organization Name</h3>
-                  <p class="fs-4 fw-semibold mb-0">Disaster Relief Management Organization</p>
-                </div>
+                <section id="defaultOverview" class="spa-view">
+                  <div class="organization-card rounded-3 p-4 mb-4 section-animate">
+                    <h3 class="h5 mb-2">Organization Name</h3>
+                    <p class="fs-4 fw-semibold mb-0">Disaster Relief Management Organization</p>
+                  </div>
 
-                <div class="row g-3 mb-4">
-                  <div class="col-12 col-md-4">
-                    <div class="metric-card p-3 rounded-3 section-animate">
-                      <p class="small text-muted mb-1">Total Stock Units</p>
-                      <h4 class="mb-0">12,480</h4>
+                  <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-4">
+                      <div class="metric-card p-3 rounded-3 section-animate">
+                        <p class="small text-muted mb-1">Total Stock Units</p>
+                        <h4 class="mb-0">12,480</h4>
+                      </div>
                     </div>
-                  </div>
-                  <div class="col-12 col-md-4">
-                    <div class="metric-card p-3 rounded-3 section-animate">
-                      <p class="small text-muted mb-1">Active Beneficiaries</p>
-                      <h4 class="mb-0">3,125</h4>
+                    <div class="col-12 col-md-4">
+                      <div class="metric-card p-3 rounded-3 section-animate">
+                        <p class="small text-muted mb-1">Active Beneficiaries</p>
+                        <h4 class="mb-0">3,125</h4>
+                      </div>
                     </div>
-                  </div>
-                  <div class="col-12 col-md-4">
-                    <div class="metric-card p-3 rounded-3 section-animate">
-                      <p class="small text-muted mb-1">Today Distributions</p>
-                      <h4 class="mb-0">42</h4>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="row g-3">
-                  <div class="col-12 col-md-6">
-                    <div id="stockBalance" class="feature-card h-100 p-3 rounded-3 section-animate">
-                      <h4 class="h6 theme-text">Stock Balance</h4>
-                      <a href="stock-balance.html" class="btn btn-sm btn-outline-primary mt-2">Open Reports</a>
-                      <p class="mb-2 text-muted">Track current relief item quantities and availability.</p>
-                      <div class="progress" role="progressbar" aria-label="Stock level" aria-valuenow="76" aria-valuemin="0" aria-valuemax="100">
-                        <div class="progress-bar" style="width: 76%">76%</div>
+                    <div class="col-12 col-md-4">
+                      <div class="metric-card p-3 rounded-3 section-animate">
+                        <p class="small text-muted mb-1">Today Distributions</p>
+                        <h4 class="mb-0">42</h4>
                       </div>
                     </div>
                   </div>
-                  <div class="col-12 col-md-6">
-                    <div id="assignDistribution" class="feature-card h-100 p-3 rounded-3 section-animate">
-                      <h4 class="h6 theme-text">Assign Distribution</h4>
-                      <p class="mb-0 text-muted">Allocate available stock to target locations and teams.</p>
+                </section>
+
+                <section id="stockBalanceListView" class="spa-view d-none">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="h5 theme-text mb-0">Stock Balance Reports</h3>
+                    <span class="small text-muted">Latest first</span>
+                  </div>
+                  <div id="reportsState" class="alert alert-info d-none"></div>
+                  <div id="reportCards" class="d-grid gap-3"></div>
+                </section>
+
+                <section id="stockBalanceDetailView" class="spa-view d-none">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="h5 theme-text mb-0">Stock Balance Report Detail</h3>
+                    <button id="backToReportsBtn" class="btn btn-outline-primary btn-sm">Back to Reports</button>
+                  </div>
+                  <div id="detailError" class="alert alert-danger d-none"></div>
+                  <div id="detailContainer" class="card border-0 shadow-sm d-none">
+                    <div class="card-body p-4">
+                      <div class="row g-3 mb-3">
+                        <div class="col-md-6"><strong>Report ID:</strong> <span id="reportId"></span></div>
+                        <div class="col-md-6"><strong>Logistic Officer Name:</strong> <span id="officerName"></span></div>
+                        <div class="col-md-6"><strong>Reported Date:</strong> <span id="reportedDate"></span></div>
+                        <div class="col-md-6"><strong>Warehouse Name:</strong> <span id="warehouseName"></span></div>
+                        <div class="col-md-6"><strong>Total Item Types:</strong> <span id="totalItemTypes"></span></div>
+                        <div class="col-md-6"><strong>Generated Timestamp:</strong> <span id="generatedTimestamp"></span></div>
+                      </div>
+                      <h4 class="h6 theme-text">Items</h4>
+                      <div class="table-responsive">
+                        <table class="table table-striped align-middle mb-0">
+                          <thead>
+                            <tr>
+                              <th>Item Name</th>
+                              <th>Category</th>
+                              <th>Quantity Available</th>
+                              <th>Unit</th>
+                            </tr>
+                          </thead>
+                          <tbody id="itemsTableBody"></tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                  <div class="col-12 col-md-6">
-                    <div id="manageBeneficiaryData" class="feature-card h-100 p-3 rounded-3 section-animate">
-                      <h4 class="h6 theme-text">Manage Beneficiary Data</h4>
-                      <p class="mb-0 text-muted">Add, update, and review beneficiary records safely.</p>
-                    </div>
+                </section>
+
+                <section id="placeholderView" class="spa-view d-none">
+                  <div class="feature-card p-4 rounded-3">
+                    <h3 id="placeholderTitle" class="h6 theme-text">Module</h3>
+                    <p class="mb-0 text-muted">This module is ready for next implementation phase.</p>
                   </div>
-                  <div class="col-12 col-md-6">
-                    <div id="distributionReport" class="feature-card h-100 p-3 rounded-3 section-animate">
-                      <h4 class="h6 theme-text">Distribution Report</h4>
-                      <p class="mb-0 text-muted">View and prepare reports for completed distributions.</p>
-                    </div>
-                  </div>
-                </div>
+                </section>
               </div>
             </div>
           </div>
@@ -144,6 +165,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="data.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
