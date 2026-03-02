@@ -1,5 +1,6 @@
 :root {
   --drms-green: #198754;
+  --drms-green-dark: #13653f;
   --drms-green-soft: #d9f3e6;
 }
 
@@ -12,6 +13,25 @@ body {
   border-radius: 1rem;
 }
 
+.drms-navbar {
+  background: linear-gradient(90deg, var(--drms-green-dark), var(--drms-green));
+}
+
+.navbar-toggler {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+.navbar .nav-link {
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link:focus,
+.navbar .nav-link.active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
 .form-control:focus {
   border-color: var(--drms-green);
   box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.2);
@@ -20,4 +40,9 @@ body {
 .organization-card {
   background-color: var(--drms-green-soft);
   border-left: 6px solid var(--drms-green);
+}
+
+.feature-card {
+  background-color: #f6fcf8;
+  border: 1px solid #d3ebde;
 }
