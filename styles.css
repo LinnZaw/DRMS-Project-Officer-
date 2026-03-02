@@ -1,0 +1,61 @@
+:root {
+  --drms-primary: #4872b7;
+  --drms-primary-dark: #365c98;
+  --drms-primary-soft: #dfe8f8;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(145deg, #eef3fd, #dfe8f8);
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+.theme-text {
+  color: var(--drms-primary);
+}
+
+.btn-theme {
+  background-color: var(--drms-primary);
+  border-color: var(--drms-primary);
+  color: #fff;
+}
+
+.btn-theme:hover,
+.btn-theme:focus {
+  background-color: var(--drms-primary-dark);
+  border-color: var(--drms-primary-dark);
+  color: #fff;
+}
+
+.form-control:focus {
+  border-color: var(--drms-primary);
+  box-shadow: 0 0 0 0.25rem rgba(72, 114, 183, 0.25);
+}
+
+.sidebar-nav {
+  background: linear-gradient(180deg, var(--drms-primary-dark), var(--drms-primary));
+}
+
+.sidebar-nav .nav-link {
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.sidebar-nav .nav-link:hover,
+.sidebar-nav .nav-link:focus,
+.sidebar-nav .nav-link.active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.organization-card {
+  background-color: var(--drms-primary-soft);
+  border-left: 6px solid var(--drms-primary);
+}
+
+.feature-card {
+  background-color: #f6f9ff;
+  border: 1px solid #cfdbf1;
+}
