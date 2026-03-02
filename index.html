@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DRMS Project Officer</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container py-5">
+      <section id="loginPage" class="row justify-content-center page-transition">
+        <div class="col-12 col-md-8 col-lg-6">
+          <div class="card shadow-lg border-0 login-shell overflow-hidden">
+            <div class="row g-0">
+              <div class="col-md-5 login-banner d-none d-md-flex flex-column justify-content-between p-4 text-white">
+                <div>
+                  <h2 class="h5 fw-semibold mb-2">DRMS Portal</h2>
+                  <p class="small mb-0 opacity-75">Project Officer Access</p>
+                </div>
+                <p class="small mb-0 opacity-75">Securely coordinate stock, beneficiaries, and distribution reports.</p>
+              </div>
+              <div class="col-12 col-md-7">
+                <div class="card-body p-4 p-md-5">
+                  <h1 class="h3 theme-text mb-2">Welcome Back</h1>
+                  <p class="text-muted mb-4">Sign in to continue to your dashboard.</p>
+
+                  <form id="loginForm" novalidate>
+                    <div class="mb-3">
+                      <label for="email" class="form-label">Email address</label>
+                      <input type="email" id="email" class="form-control" placeholder="officer@drms.org" required />
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="password" class="form-label">Password</label>
+                      <input type="password" id="password" class="form-control" placeholder="Enter your password" required />
+                    </div>
+
+                    <div id="errorMessage" class="alert alert-danger py-2 d-none" role="alert"></div>
+
+                    <button type="submit" class="btn btn-theme w-100 mt-2">Login</button>
+                    <p class="text-muted small mt-3 mb-0">Demo credentials: officer@drms.org / password123</p>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="homePage" class="d-none page-transition">
+        <div class="card shadow border-0 overflow-hidden dashboard-shell">
+          <div class="row g-0">
+            <aside class="col-12 col-lg-3 sidebar-nav p-3 p-lg-4">
+              <h3 class="h5 text-white fw-semibold mb-1">Project Officer Panel</h3>
+              <p class="small text-white-50 mb-4">Disaster Release Management System</p>
+
+              <nav id="sidebarNav" class="nav nav-pills flex-column gap-2 mb-4">
+                <a class="nav-link text-white active" href="stock-balance.html">Stock Balance</a>
+                <a class="nav-link text-white" data-target="assignDistribution" href="#assignDistribution">Assign Distribution</a>
+                <a class="nav-link text-white" data-target="manageBeneficiaryData" href="#manageBeneficiaryData">Manage Beneficiary Data</a>
+                <a class="nav-link text-white" data-target="distributionReport" href="#distributionReport">Distribution Report</a>
+              </nav>
+
+              <button id="logoutBtn" class="btn btn-light btn-sm theme-text fw-semibold">Logout</button>
+            </aside>
+
+            <div class="col-12 col-lg-9">
+              <div class="card-body p-4 p-md-5">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+                  <div>
+                    <h2 class="theme-text mb-1">Project Officer Dashboard</h2>
+                    <p class="mb-0 text-muted">Monitor relief operations in one place.</p>
+                  </div>
+                  <span class="status-badge">Live Status</span>
+                </div>
+
+                <div class="organization-card rounded-3 p-4 mb-4 section-animate">
+                  <h3 class="h5 mb-2">Organization Name</h3>
+                  <p class="fs-4 fw-semibold mb-0">Disaster Relief Management Organization</p>
+                </div>
+
+                <div class="row g-3 mb-4">
+                  <div class="col-12 col-md-4">
+                    <div class="metric-card p-3 rounded-3 section-animate">
+                      <p class="small text-muted mb-1">Total Stock Units</p>
+                      <h4 class="mb-0">12,480</h4>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <div class="metric-card p-3 rounded-3 section-animate">
+                      <p class="small text-muted mb-1">Active Beneficiaries</p>
+                      <h4 class="mb-0">3,125</h4>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <div class="metric-card p-3 rounded-3 section-animate">
+                      <p class="small text-muted mb-1">Today Distributions</p>
+                      <h4 class="mb-0">42</h4>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row g-3">
+                  <div class="col-12 col-md-6">
+                    <div id="stockBalance" class="feature-card h-100 p-3 rounded-3 section-animate">
+                      <h4 class="h6 theme-text">Stock Balance</h4>
+                      <a href="stock-balance.html" class="btn btn-sm btn-outline-primary mt-2">Open Reports</a>
+                      <p class="mb-2 text-muted">Track current relief item quantities and availability.</p>
+                      <div class="progress" role="progressbar" aria-label="Stock level" aria-valuenow="76" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="width: 76%">76%</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div id="assignDistribution" class="feature-card h-100 p-3 rounded-3 section-animate">
+                      <h4 class="h6 theme-text">Assign Distribution</h4>
+                      <p class="mb-0 text-muted">Allocate available stock to target locations and teams.</p>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div id="manageBeneficiaryData" class="feature-card h-100 p-3 rounded-3 section-animate">
+                      <h4 class="h6 theme-text">Manage Beneficiary Data</h4>
+                      <p class="mb-0 text-muted">Add, update, and review beneficiary records safely.</p>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div id="distributionReport" class="feature-card h-100 p-3 rounded-3 section-animate">
+                      <h4 class="h6 theme-text">Distribution Report</h4>
+                      <p class="mb-0 text-muted">View and prepare reports for completed distributions.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
