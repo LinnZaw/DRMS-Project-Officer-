@@ -3,10 +3,23 @@ const loginPage = document.getElementById('loginPage');
 const homePage = document.getElementById('homePage');
 const errorMessage = document.getElementById('errorMessage');
 const logoutBtn = document.getElementById('logoutBtn');
+const sidebarNavLinks = document.querySelectorAll('#sidebarNav .nav-link');
 
 const demoCredentials = {
   email: 'officer@drms.org',
   password: 'password123'
+};
+
+const showDashboard = () => {
+  loginPage.classList.add('d-none');
+  homePage.classList.remove('d-none');
+  homePage.classList.add('page-transition');
+};
+
+const showLogin = () => {
+  homePage.classList.add('d-none');
+  loginPage.classList.remove('d-none');
+  loginPage.classList.add('page-transition');
 };
 
 loginForm.addEventListener('submit', (event) => {
@@ -17,8 +30,7 @@ loginForm.addEventListener('submit', (event) => {
 
   if (email === demoCredentials.email && password === demoCredentials.password) {
     errorMessage.classList.add('d-none');
-    loginPage.classList.add('d-none');
-    homePage.classList.remove('d-none');
+    showDashboard();
     return;
   }
 
@@ -26,8 +38,23 @@ loginForm.addEventListener('submit', (event) => {
   errorMessage.classList.remove('d-none');
 });
 
+sidebarNavLinks.forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+
+    sidebarNavLinks.forEach((item) => item.classList.remove('active'));
+    link.classList.add('active');
+
+    const targetId = link.getAttribute('data-target');
+    const targetSection = document.getElementById(targetId);
+
+    if (targetSection) {
+      targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
 logoutBtn.addEventListener('click', () => {
   loginForm.reset();
-  homePage.classList.add('d-none');
-  loginPage.classList.remove('d-none');
+  showLogin();
 });
