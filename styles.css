@@ -42,11 +42,13 @@ body {
   background: linear-gradient(125deg, #2f4f84, var(--drms-primary-dark));
 }
 
-.form-control {
+.form-control,
+.form-select {
   border-radius: 10px;
 }
 
-.form-control:focus {
+.form-control:focus,
+.form-select:focus {
   border-color: var(--drms-primary);
   box-shadow: 0 0 0 0.2rem rgba(72, 114, 183, 0.18);
 }
@@ -107,7 +109,8 @@ body {
 .organization-card,
 .placeholder-card,
 .detail-card,
-.report-card {
+.report-card,
+.distribution-card {
   background-color: #fff;
   border: 1px solid #d3dff5;
   border-radius: 14px;
@@ -119,12 +122,14 @@ body {
   background: linear-gradient(160deg, #f7faff, var(--drms-primary-soft));
 }
 
-.report-list {
+.report-list,
+.distribution-list {
   display: grid;
   gap: 14px;
 }
 
-.report-card {
+.report-card,
+.distribution-card {
   width: 100%;
   padding: 1rem 1.25rem;
   cursor: pointer;
@@ -132,10 +137,54 @@ body {
 }
 
 .report-card:hover,
-.report-card:focus {
+.report-card:focus,
+.distribution-card:hover,
+.distribution-card:focus {
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(53, 90, 149, 0.14);
   outline: none;
+}
+
+.distribution-shell {
+  max-width: 980px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-draft {
+  color: #6d4b00;
+  background-color: #ffe9bd;
+}
+
+.status-assigned {
+  color: #074071;
+  background-color: #cde9ff;
+}
+
+.status-completed {
+  color: #0b5f32;
+  background-color: #cef4df;
+}
+
+.status-cancelled {
+  color: #7f1d1d;
+  background-color: #ffd8d8;
+}
+
+.form-section {
+  border: 1px solid #dce6f8;
+  border-radius: 12px;
+  padding: 1rem;
+  background: linear-gradient(180deg, #fcfdff 0%, #f8fbff 100%);
 }
 
 @media (max-width: 991px) {
