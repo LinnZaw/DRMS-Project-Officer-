@@ -4,7 +4,10 @@ const state = {
   reportsLoaded: false,
   distributions: [],
   distributionsLoaded: false,
-  distributionMeta: null
+  distributionMeta: null,
+  distributionReports: [],
+  distributionReportsLoaded: false,
+  distributionReportMeta: null
 };
 
 const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
@@ -682,6 +685,502 @@ const renderDistributionForm = async (mode, distributionId = '') => {
   }
 };
 
+
+const getDistributionReportStatusClass = (status) => {
+  const mapping = {
+    Draft: 'status-draft',
+    Submitted: 'status-submitted'
+  };
+
+  return mapping[status] || 'status-draft';
+};
+
+const initializeDistributionReportData = async () => {
+  await initializeDistributionData();
+
+  if (!state.distributionReportMeta) {
+    state.distributionReportMeta = await fetchDistributionReportMeta();
+  }
+
+  if (!state.distributionReportsLoaded) {
+    state.distributionReports = await fetchDistributionReports();
+    state.distributionReportsLoaded = true;
+  }
+};
+
+const getRemainingQuantity = (planned, actual, damaged) => Math.max((Number(planned) || 0) - (Number(actual) || 0) - (Number(damaged) || 0), 0);
+
+const createDistributionReportCard = (report) => `
+  <article class="distribution-report-card" role="button" tabindex="0" data-report-id="${report.reportId}">
+    <div class="row g-3 align-items-center">
+      <div class="col-12 col-md-2">
+        <p class="small text-muted mb-1">Report ID</p>
+        <p class="fw-semibold theme-text mb-0">${report.reportId}</p>
+      </div>
+      <div class="col-12 col-md-2">
+        <p class="small text-muted mb-1">Distribution ID</p>
+        <p class="mb-0">${report.distributionId}</p>
+      </div>
+      <div class="col-12 col-md-3">
+        <p class="small text-muted mb-1">Location</p>
+        <p class="mb-0">${report.location}</p>
+      </div>
+      <div class="col-12 col-md-3">
+        <p class="small text-muted mb-1">Report Date</p>
+        <p class="mb-0">${formatShortDate(report.reportDate)}</p>
+      </div>
+      <div class="col-12 col-md-2 text-md-end">
+        <span class="status-badge ${getDistributionReportStatusClass(report.status)}">${report.status}</span>
+      </div>
+    </div>
+  </article>
+`;
+
+const renderDistributionReportList = async () => {
+  elements.pageTitle.textContent = 'Distribution Reports';
+  elements.pageSubtitle.textContent = 'Create and manage field distribution reports.';
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading distribution reports...</div>';
+
+  try {
+    await initializeDistributionReportData();
+
+    elements.contentHost.innerHTML = `
+      <section class="distribution-shell fixed-page-shell mx-auto w-100">
+        <div class="d-flex justify-content-end mb-3">
+          <button id="createDistributionReportBtn" class="btn btn-theme">+ Create Report</button>
+        </div>
+        <div class="distribution-report-list">
+          ${
+            state.distributionReports.length
+              ? state.distributionReports.map((report) => createDistributionReportCard(report)).join('')
+              : '<div class="alert alert-info mb-0">No distribution reports available yet.</div>'
+          }
+        </div>
+      </section>
+    `;
+
+    document.getElementById('createDistributionReportBtn').addEventListener('click', () => {
+      window.location.hash = '#/distribution-report/create';
+    });
+
+    elements.contentHost.querySelectorAll('.distribution-report-card').forEach((card) => {
+      const openDetail = () => {
+        window.location.hash = `#/distribution-report/${encodeURIComponent(card.dataset.reportId)}`;
+      };
+
+      card.addEventListener('click', openDetail);
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openDetail();
+        }
+      });
+    });
+  } catch {
+    elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to load distribution reports right now.</div>';
+  }
+};
+
+const renderDistributionReportDetail = async (reportId) => {
+  elements.pageTitle.textContent = 'Distribution Report Detail';
+  elements.pageSubtitle.textContent = 'Review report sections and submission status.';
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading report detail...</div>';
+
+  try {
+    const report = await fetchDistributionReportById(reportId);
+    const isDraft = report.status === 'Draft';
+
+    const tableRows = report.itemSummary
+      .map(
+        (item) => `
+          <tr>
+            <td>${item.itemName}</td>
+            <td>${item.plannedQuantity}</td>
+            <td>${item.actualDistributedQuantity}</td>
+            <td>${item.damagedQuantity}</td>
+            <td>${getRemainingQuantity(item.plannedQuantity, item.actualDistributedQuantity, item.damagedQuantity)}</td>
+          </tr>
+        `
+      )
+      .join('');
+
+    elements.contentHost.innerHTML = `
+      <section class="distribution-shell fixed-page-shell mx-auto w-100">
+        <button id="backToDistributionReportsBtn" class="btn btn-outline-primary btn-sm mb-3">Back to Distribution Reports</button>
+
+        <article class="detail-card p-4 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <h4 class="h6 mb-1 theme-text">${report.reportId}</h4>
+              <p class="mb-0 text-muted">Related Distribution: ${report.distributionId}</p>
+            </div>
+            <span class="status-badge ${getDistributionReportStatusClass(report.status)}">${report.status}</span>
+          </div>
+        </article>
+
+        <article class="detail-card p-4 mb-3">
+          <h5 class="h6 theme-text mb-3">Basic Information</h5>
+          <div class="row g-3">
+            <div class="col-12 col-md-6"><strong>Report Date:</strong> ${formatShortDate(report.reportDate)}</div>
+            <div class="col-12 col-md-6"><strong>Location:</strong> ${report.location}</div>
+            <div class="col-12 col-md-6"><strong>Prepared By:</strong> ${report.preparedBy}</div>
+            <div class="col-12 col-md-6"><strong>Implementing Team:</strong> ${report.implementingTeam}</div>
+            <div class="col-12"><strong>Weather Condition:</strong> ${report.weatherCondition || 'N/A'}</div>
+          </div>
+        </article>
+
+        <article class="detail-card p-4 mb-3">
+          <h5 class="h6 theme-text mb-3">Item Distribution Summary</h5>
+          <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th>Planned Quantity</th>
+                  <th>Actual Distributed Quantity</th>
+                  <th>Damaged Quantity</th>
+                  <th>Remaining Quantity</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="detail-card p-4 mb-3">
+          <h5 class="h6 theme-text mb-3">Beneficiary Summary</h5>
+          <div class="row g-3">
+            <div class="col-12 col-md-6"><strong>Total Households Assisted:</strong> ${report.beneficiarySummary.totalHouseholdsAssisted}</div>
+            <div class="col-12 col-md-6"><strong>Total Individuals Assisted:</strong> ${report.beneficiarySummary.totalIndividualsAssisted}</div>
+            <div class="col-6 col-md-3"><strong>Male:</strong> ${report.beneficiarySummary.male}</div>
+            <div class="col-6 col-md-3"><strong>Female:</strong> ${report.beneficiarySummary.female}</div>
+            <div class="col-6 col-md-3"><strong>Children:</strong> ${report.beneficiarySummary.children}</div>
+            <div class="col-6 col-md-3"><strong>Elderly:</strong> ${report.beneficiarySummary.elderly}</div>
+            <div class="col-12 col-md-4"><strong>Persons with Disability:</strong> ${report.beneficiarySummary.personsWithDisability}</div>
+          </div>
+        </article>
+
+        <article class="detail-card p-4 mb-3">
+          <h5 class="h6 theme-text mb-3">Activity Report</h5>
+          <div class="mb-3"><strong>Distribution Process Summary</strong><p class="mb-0">${report.activityReport.distributionProcessSummary || 'N/A'}</p></div>
+          <div class="mb-3"><strong>Challenges Faced</strong><p class="mb-0">${report.activityReport.challengesFaced || 'N/A'}</p></div>
+          <div class="mb-3"><strong>Security Issues</strong><p class="mb-0">${report.activityReport.securityIssues || 'N/A'}</p></div>
+          <div><strong>Recommendations</strong><p class="mb-0">${report.activityReport.recommendations || 'N/A'}</p></div>
+        </article>
+
+        <div class="d-flex flex-wrap gap-2">
+          <button id="editDistributionReportBtn" class="btn btn-theme" ${isDraft ? '' : 'disabled'}>Edit</button>
+          <button id="deleteDistributionReportBtn" class="btn btn-outline-danger" ${isDraft ? '' : 'disabled'}>Delete</button>
+          <button id="submitDistributionReportBtn" class="btn btn-success" ${isDraft ? '' : 'disabled'}>Submit</button>
+        </div>
+        ${isDraft ? '' : '<p class="text-muted small mt-2 mb-0">This report has been submitted. Editing and deletion are disabled.</p>'}
+      </section>
+    `;
+
+    document.getElementById('backToDistributionReportsBtn').addEventListener('click', () => {
+      window.location.hash = '#/distribution-report';
+    });
+
+    document.getElementById('editDistributionReportBtn').addEventListener('click', () => {
+      if (isDraft) {
+        window.location.hash = `#/distribution-report/edit/${encodeURIComponent(report.reportId)}`;
+      }
+    });
+
+    document.getElementById('deleteDistributionReportBtn').addEventListener('click', async () => {
+      if (!isDraft) return;
+      if (!window.confirm('Delete this distribution report?')) return;
+      await deleteDistributionReport(report.reportId);
+      state.distributionReports = await fetchDistributionReports();
+      window.location.hash = '#/distribution-report';
+    });
+
+    document.getElementById('submitDistributionReportBtn').addEventListener('click', async () => {
+      if (!isDraft) return;
+      await updateDistributionReport(report.reportId, { status: 'Submitted' });
+      state.distributionReports = await fetchDistributionReports();
+      window.location.hash = `#/distribution-report/${encodeURIComponent(report.reportId)}`;
+    });
+  } catch {
+    elements.contentHost.innerHTML = '<div class="alert alert-danger">Distribution report not found.</div>';
+  }
+};
+
+const renderDistributionReportForm = async (mode, reportId = '') => {
+  const isEdit = mode === 'edit';
+  elements.pageTitle.textContent = isEdit ? 'Edit Distribution Report' : 'Create Distribution Report';
+  elements.pageSubtitle.textContent = 'Provide complete information across all report sections.';
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading report form...</div>';
+
+  try {
+    await initializeDistributionReportData();
+    const meta = state.distributionReportMeta;
+    const existing = isEdit ? await fetchDistributionReportById(reportId) : null;
+
+    if (existing && existing.status === 'Submitted') {
+      elements.contentHost.innerHTML = '<div class="alert alert-warning">Submitted reports cannot be edited.</div>';
+      return;
+    }
+
+    const reportIdValue = existing?.reportId || generateDistributionReportId();
+    const defaultDistributionId = existing?.distributionId || meta.distributions[0]?.distributionId || '';
+
+    const distributionOptions = meta.distributions
+      .map(
+        (distribution) =>
+          `<option value="${distribution.distributionId}" ${distribution.distributionId === defaultDistributionId ? 'selected' : ''}>${distribution.distributionId}</option>`
+      )
+      .join('');
+
+    const getInitialItems = (distributionId) => {
+      if (existing?.itemSummary?.length && distributionId === existing.distributionId) {
+        return existing.itemSummary;
+      }
+      return (meta.itemTemplates[distributionId] || []).map((item) => ({
+        ...item,
+        actualDistributedQuantity: 0,
+        damagedQuantity: 0
+      }));
+    };
+
+    const initialItems = getInitialItems(defaultDistributionId);
+
+    const beneficiary = existing?.beneficiarySummary || {
+      totalHouseholdsAssisted: 0,
+      totalIndividualsAssisted: 0,
+      male: 0,
+      female: 0,
+      children: 0,
+      elderly: 0,
+      personsWithDisability: 0
+    };
+
+    const activity = existing?.activityReport || {
+      distributionProcessSummary: '',
+      challengesFaced: '',
+      securityIssues: '',
+      recommendations: ''
+    };
+
+    const getLocationForDistribution = (distributionId) =>
+      meta.distributions.find((distribution) => distribution.distributionId === distributionId)?.location || '';
+
+    elements.contentHost.innerHTML = `
+      <section class="distribution-shell fixed-page-shell mx-auto w-100">
+        <button id="backToDistributionReportListBtn" type="button" class="btn btn-outline-primary btn-sm mb-3">Back to Distribution Reports</button>
+
+        <form id="distributionReportForm" class="needs-validation" novalidate>
+          <article class="form-section mb-3">
+            <h5 class="h6 theme-text mb-3">SECTION 1 — Basic Information</h5>
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="distributionIdInput">Distribution ID</label>
+                <select id="distributionIdInput" name="distributionId" class="form-select" required>
+                  <option value="">Select distribution</option>
+                  ${distributionOptions}
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="reportDateInput">Report Date</label>
+                <input id="reportDateInput" name="reportDate" type="date" class="form-control" required value="${existing?.reportDate || getTodayDateValue()}" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="locationInput">Location</label>
+                <input id="locationInput" name="location" type="text" class="form-control" readonly value="${existing?.location || getLocationForDistribution(defaultDistributionId)}" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="preparedByInput">Prepared By</label>
+                <input id="preparedByInput" name="preparedBy" type="text" class="form-control" readonly value="${existing?.preparedBy || meta.preparedBy}" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="implementingTeamInput">Implementing Team</label>
+                <input id="implementingTeamInput" name="implementingTeam" type="text" class="form-control" required value="${existing?.implementingTeam || ''}" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="weatherConditionInput">Weather Condition</label>
+                <input id="weatherConditionInput" name="weatherCondition" type="text" class="form-control" value="${existing?.weatherCondition || ''}" />
+              </div>
+            </div>
+          </article>
+
+          <article class="form-section mb-3">
+            <h5 class="h6 theme-text mb-3">SECTION 2 — Item Distribution Summary</h5>
+            <div class="table-responsive">
+              <table class="table table-striped align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Planned Quantity</th>
+                    <th>Actual Distributed Quantity</th>
+                    <th>Damaged Quantity</th>
+                    <th>Remaining Quantity</th>
+                  </tr>
+                </thead>
+                <tbody id="itemSummaryRows"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="form-section mb-3">
+            <h5 class="h6 theme-text mb-3">SECTION 3 — Beneficiary Summary</h5>
+            <div class="row g-3">
+              ${[
+                ['totalHouseholdsAssisted', 'Total Households Assisted'],
+                ['totalIndividualsAssisted', 'Total Individuals Assisted'],
+                ['male', 'Male'],
+                ['female', 'Female'],
+                ['children', 'Children'],
+                ['elderly', 'Elderly'],
+                ['personsWithDisability', 'Persons with Disability']
+              ]
+                .map(
+                  ([key, label]) => `
+                    <div class="col-12 col-md-6 col-xl-4">
+                      <label class="form-label" for="${key}Input">${label}</label>
+                      <input id="${key}Input" name="${key}" type="number" min="0" class="form-control" required value="${beneficiary[key]}" />
+                    </div>
+                  `
+                )
+                .join('')}
+            </div>
+          </article>
+
+          <article class="form-section mb-4">
+            <h5 class="h6 theme-text mb-3">SECTION 4 — Activity Report</h5>
+            <div class="row g-3">
+              ${[
+                ['distributionProcessSummary', 'Distribution Process Summary'],
+                ['challengesFaced', 'Challenges Faced'],
+                ['securityIssues', 'Security Issues'],
+                ['recommendations', 'Recommendations']
+              ]
+                .map(
+                  ([key, label]) => `
+                    <div class="col-12">
+                      <label class="form-label" for="${key}Input">${label}</label>
+                      <textarea id="${key}Input" name="${key}" class="form-control" rows="4" required>${activity[key]}</textarea>
+                    </div>
+                  `
+                )
+                .join('')}
+            </div>
+          </article>
+
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <button type="button" id="saveDraftBtn" class="btn btn-outline-primary">Save as Draft</button>
+            <button type="button" id="submitReportBtn" class="btn btn-theme">Submit Report</button>
+          </div>
+        </form>
+      </section>
+    `;
+
+    const form = document.getElementById('distributionReportForm');
+    const distributionInput = document.getElementById('distributionIdInput');
+    const locationInput = document.getElementById('locationInput');
+    const itemRowsHost = document.getElementById('itemSummaryRows');
+    let workingItems = JSON.parse(JSON.stringify(initialItems));
+
+    const renderItemRows = () => {
+      itemRowsHost.innerHTML = workingItems
+        .map(
+          (item, index) => `
+            <tr>
+              <td>${item.itemName}</td>
+              <td><input type="number" class="form-control" value="${item.plannedQuantity}" readonly /></td>
+              <td><input type="number" min="0" class="form-control item-actual" data-index="${index}" value="${item.actualDistributedQuantity || 0}" required /></td>
+              <td><input type="number" min="0" class="form-control item-damaged" data-index="${index}" value="${item.damagedQuantity || 0}" required /></td>
+              <td><input type="number" class="form-control" value="${getRemainingQuantity(item.plannedQuantity, item.actualDistributedQuantity, item.damagedQuantity)}" readonly /></td>
+            </tr>
+          `
+        )
+        .join('');
+
+      itemRowsHost.querySelectorAll('.item-actual').forEach((input) => {
+        input.addEventListener('input', (event) => {
+          const index = Number(event.target.dataset.index);
+          workingItems[index].actualDistributedQuantity = Number(event.target.value) || 0;
+          renderItemRows();
+        });
+      });
+
+      itemRowsHost.querySelectorAll('.item-damaged').forEach((input) => {
+        input.addEventListener('input', (event) => {
+          const index = Number(event.target.dataset.index);
+          workingItems[index].damagedQuantity = Number(event.target.value) || 0;
+          renderItemRows();
+        });
+      });
+    };
+
+    renderItemRows();
+
+    distributionInput.addEventListener('change', () => {
+      locationInput.value = getLocationForDistribution(distributionInput.value);
+      if (!isEdit || distributionInput.value !== existing?.distributionId) {
+        workingItems = getInitialItems(distributionInput.value);
+        renderItemRows();
+      }
+    });
+
+    document.getElementById('backToDistributionReportListBtn').addEventListener('click', () => {
+      window.location.hash = '#/distribution-report';
+    });
+
+    const persistReport = async (status) => {
+      if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+      }
+
+      const payload = {
+        reportId: reportIdValue,
+        distributionId: form.distributionId.value,
+        reportDate: form.reportDate.value,
+        location: form.location.value,
+        preparedBy: form.preparedBy.value,
+        implementingTeam: form.implementingTeam.value,
+        weatherCondition: form.weatherCondition.value,
+        status,
+        itemSummary: workingItems.map((item) => ({
+          itemName: item.itemName,
+          plannedQuantity: Number(item.plannedQuantity) || 0,
+          actualDistributedQuantity: Number(item.actualDistributedQuantity) || 0,
+          damagedQuantity: Number(item.damagedQuantity) || 0
+        })),
+        beneficiarySummary: {
+          totalHouseholdsAssisted: Number(form.totalHouseholdsAssisted.value) || 0,
+          totalIndividualsAssisted: Number(form.totalIndividualsAssisted.value) || 0,
+          male: Number(form.male.value) || 0,
+          female: Number(form.female.value) || 0,
+          children: Number(form.children.value) || 0,
+          elderly: Number(form.elderly.value) || 0,
+          personsWithDisability: Number(form.personsWithDisability.value) || 0
+        },
+        activityReport: {
+          distributionProcessSummary: form.distributionProcessSummary.value,
+          challengesFaced: form.challengesFaced.value,
+          securityIssues: form.securityIssues.value,
+          recommendations: form.recommendations.value
+        }
+      };
+
+      if (isEdit) {
+        await updateDistributionReport(reportId, payload);
+      } else {
+        await createDistributionReport(payload);
+      }
+
+      state.distributionReports = await fetchDistributionReports();
+      window.location.hash = `#/distribution-report/${encodeURIComponent(reportIdValue)}`;
+    };
+
+    document.getElementById('saveDraftBtn').addEventListener('click', () => persistReport('Draft'));
+    document.getElementById('submitReportBtn').addEventListener('click', () => persistReport('Submitted'));
+  } catch {
+    elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to open report form.</div>';
+  }
+};
+
 const renderRoute = async () => {
   if (!state.isAuthenticated) return;
 
@@ -725,7 +1224,23 @@ const renderRoute = async () => {
   }
 
   if (mainRoute === 'distribution-report') {
-    renderPlaceholder('Distribution Report');
+    if (!routeParam) {
+      await renderDistributionReportList();
+      return;
+    }
+
+    if (routeParam === 'create') {
+      await renderDistributionReportForm('create');
+      return;
+    }
+
+    const editMatch = routeParam.match(/^edit\/(.*)$/);
+    if (editMatch) {
+      await renderDistributionReportForm('edit', decodeURIComponent(editMatch[1]));
+      return;
+    }
+
+    await renderDistributionReportDetail(decodeURIComponent(routeParam));
     return;
   }
 
