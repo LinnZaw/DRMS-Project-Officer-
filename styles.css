@@ -241,3 +241,27 @@ body {
   color: #0f5132;
   background-color: #d1e7dd;
 }
+
+.stock-card {
+  background-color: #fff;
+  border: 1px solid #d3dff5;
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(53, 90, 149, 0.08);
+}
+
+.stock-field {
+  margin-bottom: 0.45rem;
+  color: #2f3f5d;
+  font-size: 0.95rem;
+}
+
+.stock-label {
+  font-weight: 600;
+  color: #355a95;
+}
+
+.stock-list-scroll {
+  overflow-y: auto;
+  max-height: calc(100vh - 210px);
+  padding-right: 0.4rem;
+}

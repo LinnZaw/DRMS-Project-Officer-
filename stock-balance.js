@@ -1,61 +1,73 @@
-const reportCards = document.getElementById('reportCards');
-const reportsState = document.getElementById('reportsState');
+const stockCards = document.getElementById('stockCards');
 
-const formatDate = (value) =>
-  new Date(value).toLocaleString('en-GB', {
+const formatDate = (value) => {
+  if (!value) return 'N/A';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString('en-GB', {
     year: 'numeric',
     month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
+    day: '2-digit'
   });
+};
 
-const renderCard = (report) => {
+const getField = (item, keys, fallback = 'N/A') => {
+  for (const key of keys) {
+    if (item?.[key] !== undefined && item[key] !== null && item[key] !== '') {
+      return item[key];
+    }
+  }
+  return fallback;
+};
+
+const renderStockCard = (stock) => {
   const col = document.createElement('div');
-  col.className = 'col-12 col-md-6 col-lg-4';
+  col.className = 'col-12 col-lg-6';
+
+  const itemName = getField(stock, ['itemName', 'item_name', 'name']);
+  const eventType = getField(stock, ['eventType', 'event_type']);
+  const itemDescription = getField(stock, ['itemDescription', 'item_description', 'description']);
+  const itemType = getField(stock, ['type', 'itemType', 'item_type']);
+  const quantity = getField(stock, ['quantity', 'qty'], '-');
+  const unit = getField(stock, ['unit', 'unitType'], '');
+  const storageLocation = getField(stock, ['storageLocation', 'storage_location', 'location']);
+  const manufacturedDate = formatDate(getField(stock, ['manufacturedDate', 'manufactureDate', 'manufactured_date'], ''));
+  const expiredDate = formatDate(getField(stock, ['expiredDate', 'expiryDate', 'expired_date'], ''));
 
   col.innerHTML = `
-    <article class="report-card h-100 p-3" role="button" tabindex="0" data-id="${report.reportId}">
-      <p class="small text-muted mb-1">Report ID</p>
-      <h2 class="h6 theme-text mb-2">${report.reportId}</h2>
-      <p class="small text-muted mb-1">Logistic Officer Name</p>
-      <p class="mb-2">${report.logisticOfficerName}</p>
-      <p class="small text-muted mb-1">Reported Date</p>
-      <p class="mb-0">${formatDate(report.reportedDate)}</p>
+    <article class="stock-card h-100 p-3">
+      <h2 class="h5 theme-text mb-3">${itemName}</h2>
+      <div class="stock-field"><span class="stock-label">Event Type:</span> <span>${eventType}</span></div>
+      <div class="stock-field"><span class="stock-label">Item Description:</span> <span>${itemDescription}</span></div>
+      <div class="stock-field"><span class="stock-label">Type:</span> <span>${itemType}</span></div>
+      <div class="stock-field"><span class="stock-label">Quantity:</span> <span>${quantity} ${unit}</span></div>
+      <div class="stock-field"><span class="stock-label">Storage Location:</span> <span>${storageLocation}</span></div>
+      <div class="stock-field"><span class="stock-label">Manufactured Date:</span> <span>${manufacturedDate}</span></div>
+      <div class="stock-field"><span class="stock-label">Expired Date:</span> <span>${expiredDate}</span></div>
     </article>
   `;
-
-  const goToDetail = () => {
-    window.location.href = `stock-balance-detail.html?reportId=${encodeURIComponent(report.reportId)}`;
-  };
-
-  const card = col.querySelector('.report-card');
-  card.addEventListener('click', goToDetail);
-  card.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      goToDetail();
-    }
-  });
 
   return col;
 };
 
-const loadReports = async () => {
+const loadStocks = async () => {
   try {
-    const reports = await fetchStockBalanceReports();
-
-    if (reports.length === 0) {
-      reportsState.textContent = 'No Stock Balance Reports Available';
-      reportsState.classList.remove('d-none');
-      return;
+    const response = await fetch('http://localhost:8080/api/stocks');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    reports.forEach((report) => reportCards.appendChild(renderCard(report)));
+    const payload = await response.json();
+    const stocks = Array.isArray(payload?.data?.stockInfo) ? payload.data.stockInfo : [];
+
+    stockCards.innerHTML = '';
+    stocks.forEach((stock) => stockCards.appendChild(renderStockCard(stock)));
   } catch (error) {
-    reportsState.textContent = 'Unable to load reports. Please try again later.';
-    reportsState.classList.remove('d-none');
+    console.error('Failed to load stock data');
   }
 };
 
-loadReports();
+loadStocks();
