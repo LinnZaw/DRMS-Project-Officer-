@@ -118,7 +118,7 @@ const displayValue = (value) => {
 };
 
 /**
- * Format date values to a readable UI format.
+ * Format stock dates for readable UI.
  */
 const formatStockDate = (value) => {
   if (!value) return 'N/A';
@@ -136,7 +136,27 @@ const formatStockDate = (value) => {
 };
 
 /**
- * Combine quantity and unit as one readable label.
+ * Format stock date+time values for list cards.
+ */
+const formatStockDateTime = (value) => {
+  if (!value) return 'N/A';
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return displayValue(value);
+  }
+
+  return parsedDate.toLocaleString('en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+/**
+ * Build quantity + unit text.
  */
 const formatQuantityWithUnit = (quantity, unit) => {
   const quantityText = displayValue(quantity);
@@ -153,89 +173,37 @@ const formatQuantityWithUnit = (quantity, unit) => {
   return `${quantityText} ${unitText}`;
 };
 
-
 /**
- * Normalize stockInfo payload to an array so one or many records are supported.
+ * Normalize API payload to an array of stock records.
  */
-const normalizeStockInfo = (stockInfo) => {
-  if (Array.isArray(stockInfo)) {
-    return stockInfo;
+const normalizeStockInfo = (payload) => {
+  const source = payload?.data?.stockInfo ?? payload?.data ?? payload;
+
+  if (Array.isArray(source)) {
+    return source;
   }
 
-  if (stockInfo && typeof stockInfo === 'object') {
-    return [stockInfo];
+  if (source && typeof source === 'object' && ('itemName' in source || 'eventType' in source || 'storageLocation' in source)) {
+    return [source];
   }
 
   return [];
 };
 
 /**
- * Build a single stock card for the Stock Balance view.
+ * Return a date value used for sorting stock cards (latest first).
  */
-const createStockCard = (stock) => `
-  <div class="col-12 col-lg-6">
-    <article class="stock-card h-100 p-3">
-      <h2 class="h5 theme-text mb-3">${displayValue(stock.itemName)}</h2>
-      <div class="stock-field"><span class="stock-label">Event Type:</span> <span>${displayValue(stock.eventType)}</span></div>
-      <div class="stock-field"><span class="stock-label">Item Description:</span> <span>${displayValue(stock.itemDescription)}</span></div>
-      <div class="stock-field"><span class="stock-label">Type:</span> <span>${displayValue(stock.type)}</span></div>
-      <div class="stock-field"><span class="stock-label">Quantity:</span> <span>${formatQuantityWithUnit(stock.quantity, stock.unitOfMeasure)}</span></div>
-      <div class="stock-field"><span class="stock-label">Storage Location:</span> <span>${displayValue(stock.storageLocation)}</span></div>
-      <div class="stock-field"><span class="stock-label">Manufactured Date:</span> <span>${formatStockDate(stock.manufacturedDate)}</span></div>
-      <div class="stock-field"><span class="stock-label">Expired Date:</span> <span>${formatStockDate(stock.expiriedDate || stock.expiredDate)}</span></div>
-    </article>
-  </div>
-`;
+const getReportedDateValue = (stock) => stock.reportedDate || stock.createdDate || stock.updatedDate || stock.manufacturedDate || null;
 
-const createDistributionCard = (distribution) => `
-  <article class="distribution-card" role="button" tabindex="0" data-distribution-id="${distribution.distributionId}">
-    <div class="row g-3 align-items-center">
-      <div class="col-12 col-md-3">
-        <p class="small text-muted mb-1">Distribution ID</p>
-        <p class="fw-semibold theme-text mb-0">${distribution.distributionId}</p>
-      </div>
-      <div class="col-12 col-md-4">
-        <p class="small text-muted mb-1">Project Name</p>
-        <p class="mb-0">${distribution.projectName}</p>
-      </div>
-      <div class="col-12 col-md-3">
-        <p class="small text-muted mb-1">Distribution Date</p>
-        <p class="mb-0">${formatShortDate(distribution.distributionDate)}</p>
-      </div>
-      <div class="col-12 col-md-2 text-md-end">
-        <span class="status-badge ${getDistributionStatusClass(distribution.status)}">${distribution.status}</span>
-      </div>
-    </div>
-  </article>
-`;
+/**
+ * Return a readable stock identifier.
+ */
+const getStockBalanceId = (stock, index) => displayValue(stock.stockBalanceId || stock.id || `Record-${index + 1}`);
 
-const initializeDistributionData = async () => {
-  if (!state.distributionMeta) {
-    state.distributionMeta = await fetchDistributionMeta();
-  }
-
-  if (!state.distributionsLoaded) {
-    state.distributions = await fetchDistributions();
-    state.distributionsLoaded = true;
-  }
-};
-
-const loadTownshipOptions = (stateName) => {
-  const locations = state.distributionMeta?.locationHierarchy || {};
-  return stateName ? Object.keys(locations[stateName] || {}) : [];
-};
-
-const loadVillageOptions = (stateName, townshipName) => {
-  const locations = state.distributionMeta?.locationHierarchy || {};
-  if (!stateName || !townshipName) {
-    return [];
-  }
-
-  return locations[stateName]?.[townshipName] || [];
-};
-
-// Render Stock Balance state message + cards in a consistent SPA layout.
-const renderStockBalanceContent = (messageType, messageText, stockInfo = []) => {
+/**
+ * Render stock list content with optional status messages.
+ */
+const renderStockBalanceContent = (messageType, messageText, bodyHtml = '') => {
   const alertClassMap = {
     success: 'alert-success',
     info: 'alert-info',
@@ -247,19 +215,109 @@ const renderStockBalanceContent = (messageType, messageText, stockInfo = []) => 
   elements.contentHost.innerHTML = `
     <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
       <div class="alert ${alertClass} mb-0" role="alert">${messageText}</div>
-      <div class="stock-list-scroll">
-        <div class="row g-3">
-          ${stockInfo.map((stock) => createStockCard(stock)).join('')}
-        </div>
-      </div>
+      <div class="stock-list-scroll">${bodyHtml}</div>
     </section>
   `;
 };
 
-// Fetch stock data from API and render cards with frontend status messages.
+/**
+ * Build a long stock summary card for list view.
+ */
+const createStockSummaryCard = (stock, index) => `
+  <article class="stock-summary-card" role="button" tabindex="0" data-stock-index="${index}">
+    <div class="row g-3 align-items-center">
+      <div class="col-12 col-md-3">
+        <p class="small text-muted mb-1">Stock Balance ID</p>
+        <p class="fw-semibold theme-text mb-0">${getStockBalanceId(stock, index)}</p>
+      </div>
+      <div class="col-12 col-md-5">
+        <p class="small text-muted mb-1">Storage Location</p>
+        <p class="mb-0">${displayValue(stock.storageLocation)}</p>
+      </div>
+      <div class="col-12 col-md-4 text-md-end">
+        <p class="small text-muted mb-1">Reported Date</p>
+        <p class="mb-0">${formatStockDateTime(getReportedDateValue(stock))}</p>
+      </div>
+    </div>
+  </article>
+`;
+
+/**
+ * Build detailed stock card with full fields.
+ */
+const createStockDetailCard = (stock, index) => `
+  <article class="stock-card p-4">
+    <div class="row g-3">
+      <div class="col-12 col-md-6"><strong>Stock Balance ID:</strong> ${getStockBalanceId(stock, index)}</div>
+      <div class="col-12 col-md-6"><strong>Reported Date:</strong> ${formatStockDateTime(getReportedDateValue(stock))}</div>
+      <div class="col-12 col-md-6"><strong>Item Name:</strong> ${displayValue(stock.itemName)}</div>
+      <div class="col-12 col-md-6"><strong>Event Type:</strong> ${displayValue(stock.eventType)}</div>
+      <div class="col-12"><strong>Item Description:</strong> ${displayValue(stock.itemDescription)}</div>
+      <div class="col-12 col-md-6"><strong>Type:</strong> ${displayValue(stock.type)}</div>
+      <div class="col-12 col-md-6"><strong>Quantity:</strong> ${formatQuantityWithUnit(stock.quantity, stock.unitOfMeasure)}</div>
+      <div class="col-12 col-md-6"><strong>Storage Location:</strong> ${displayValue(stock.storageLocation)}</div>
+      <div class="col-12 col-md-6"><strong>Manufactured Date:</strong> ${formatStockDate(stock.manufacturedDate)}</div>
+      <div class="col-12 col-md-6"><strong>Expired Date:</strong> ${formatStockDate(stock.expiriedDate || stock.expiredDate)}</div>
+    </div>
+  </article>
+`;
+
+/**
+ * Render stock list cards and attach click handlers.
+ */
+const renderStockBalanceListView = (stocks) => {
+  renderStockBalanceContent(
+    'success',
+    'Stock data loaded successfully.',
+    `<section class="d-grid gap-3">${stocks.map((stock, index) => createStockSummaryCard(stock, index)).join('')}</section>`
+  );
+
+  const cards = elements.contentHost.querySelectorAll('.stock-summary-card');
+  cards.forEach((card) => {
+    const openDetail = () => {
+      const record = stocks[Number(card.dataset.stockIndex)];
+      if (record) {
+        renderStockBalanceDetailView(record, Number(card.dataset.stockIndex), stocks);
+      }
+    };
+
+    card.addEventListener('click', openDetail);
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openDetail();
+      }
+    });
+  });
+};
+
+/**
+ * Render detail view for a selected stock card.
+ */
+const renderStockBalanceDetailView = (stock, index, stocks) => {
+  renderStockBalanceContent(
+    'success',
+    'Stock data loaded successfully.',
+    `
+      <div class="mb-3">
+        <button id="backToStockListBtn" class="btn btn-outline-primary btn-sm">Back to Stock List</button>
+      </div>
+      ${createStockDetailCard(stock, index)}
+    `
+  );
+
+  const backBtn = document.getElementById('backToStockListBtn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => renderStockBalanceListView(stocks));
+  }
+};
+
+/**
+ * Fetch stock list, sort by latest date, and render list view.
+ */
 const renderStockBalanceList = async () => {
   elements.pageTitle.textContent = 'Stock Balance';
-  elements.pageSubtitle.textContent = 'Current stock details from the API.';
+  elements.pageSubtitle.textContent = 'Stock balance records sorted by latest reported date.';
   renderStockBalanceContent('info', 'Loading stock data...');
 
   try {
@@ -268,15 +326,19 @@ const renderStockBalanceList = async () => {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const responseData = await response.json();
-    const stockInfo = normalizeStockInfo(responseData?.data?.stockInfo);
+    const payload = await response.json();
+    const stocks = normalizeStockInfo(payload).sort((left, right) => {
+      const leftDate = new Date(getReportedDateValue(left) || 0).getTime();
+      const rightDate = new Date(getReportedDateValue(right) || 0).getTime();
+      return rightDate - leftDate;
+    });
 
-    if (!stockInfo.length) {
+    if (!stocks.length) {
       renderStockBalanceContent('info', 'No stock data available.');
       return;
     }
 
-    renderStockBalanceContent('success', 'Stock data loaded successfully.', stockInfo);
+    renderStockBalanceListView(stocks);
   } catch {
     renderStockBalanceContent('error', 'Failed to load stock data.');
   }
