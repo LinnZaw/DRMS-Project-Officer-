@@ -153,6 +153,22 @@ const formatQuantityWithUnit = (quantity, unit) => {
   return `${quantityText} ${unitText}`;
 };
 
+
+/**
+ * Normalize stockInfo payload to an array so one or many records are supported.
+ */
+const normalizeStockInfo = (stockInfo) => {
+  if (Array.isArray(stockInfo)) {
+    return stockInfo;
+  }
+
+  if (stockInfo && typeof stockInfo === 'object') {
+    return [stockInfo];
+  }
+
+  return [];
+};
+
 /**
  * Build a single stock card for the Stock Balance view.
  */
@@ -163,10 +179,10 @@ const createStockCard = (stock) => `
       <div class="stock-field"><span class="stock-label">Event Type:</span> <span>${displayValue(stock.eventType)}</span></div>
       <div class="stock-field"><span class="stock-label">Item Description:</span> <span>${displayValue(stock.itemDescription)}</span></div>
       <div class="stock-field"><span class="stock-label">Type:</span> <span>${displayValue(stock.type)}</span></div>
-      <div class="stock-field"><span class="stock-label">Quantity:</span> <span>${formatQuantityWithUnit(stock.quantity, stock.unit)}</span></div>
+      <div class="stock-field"><span class="stock-label">Quantity:</span> <span>${formatQuantityWithUnit(stock.quantity, stock.unitOfMeasure)}</span></div>
       <div class="stock-field"><span class="stock-label">Storage Location:</span> <span>${displayValue(stock.storageLocation)}</span></div>
       <div class="stock-field"><span class="stock-label">Manufactured Date:</span> <span>${formatStockDate(stock.manufacturedDate)}</span></div>
-      <div class="stock-field"><span class="stock-label">Expired Date:</span> <span>${formatStockDate(stock.expiredDate)}</span></div>
+      <div class="stock-field"><span class="stock-label">Expired Date:</span> <span>${formatStockDate(stock.expiriedDate || stock.expiredDate)}</span></div>
     </article>
   </div>
 `;
@@ -253,7 +269,7 @@ const renderStockBalanceList = async () => {
     }
 
     const responseData = await response.json();
-    const stockInfo = Array.isArray(responseData?.data?.stockInfo) ? responseData.data.stockInfo : [];
+    const stockInfo = normalizeStockInfo(responseData?.data?.stockInfo);
 
     if (!stockInfo.length) {
       renderStockBalanceContent('info', 'No stock data available.');
