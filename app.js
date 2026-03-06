@@ -1,7 +1,5 @@
 const state = {
   isAuthenticated: false,
-  reports: [],
-  reportsLoaded: false,
   distributions: [],
   distributionsLoaded: false,
   distributionMeta: null,
@@ -23,6 +21,8 @@ const elements = {
   contentHost: document.getElementById('contentHost'),
   sidebarLinks: document.querySelectorAll('#sidebarNav .nav-link')
 };
+
+const STOCK_API_URL = 'http://localhost:8080/api/stocks';
 
 const formatDate = (value) =>
   new Date(value).toLocaleString('en-GB', {
@@ -106,178 +106,241 @@ const renderPlaceholder = (title) => {
   `;
 };
 
-const createReportCard = (report) => `
-  <article class="report-card" role="button" tabindex="0" data-report-id="${report.reportId}">
+/**
+ * Return fallback text for empty/null values.
+ */
+const displayValue = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return 'N/A';
+  }
+
+  return value;
+};
+
+/**
+ * Format stock dates for readable UI.
+ */
+const formatStockDate = (value) => {
+  if (!value) return 'N/A';
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return displayValue(value);
+  }
+
+  return parsedDate.toLocaleDateString('en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit'
+  });
+};
+
+/**
+ * Format stock date+time values for list cards.
+ */
+const formatStockDateTime = (value) => {
+  if (!value) return 'N/A';
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return displayValue(value);
+  }
+
+  return parsedDate.toLocaleString('en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+/**
+ * Build quantity + unit text.
+ */
+const formatQuantityWithUnit = (quantity, unit) => {
+  const quantityText = displayValue(quantity);
+  const unitText = displayValue(unit);
+
+  if (quantityText === 'N/A' && unitText === 'N/A') {
+    return 'N/A';
+  }
+
+  if (unitText === 'N/A') {
+    return quantityText;
+  }
+
+  return `${quantityText} ${unitText}`;
+};
+
+/**
+ * Normalize API payload to an array of stock records.
+ */
+const normalizeStockInfo = (payload) => {
+  const source = payload?.data?.stockInfo ?? payload?.data ?? payload;
+
+  if (Array.isArray(source)) {
+    return source;
+  }
+
+  if (source && typeof source === 'object' && ('itemName' in source || 'eventType' in source || 'storageLocation' in source)) {
+    return [source];
+  }
+
+  return [];
+};
+
+/**
+ * Return a date value used for sorting stock cards (latest first).
+ */
+const getReportedDateValue = (stock) => stock.reportedDate || stock.createdDate || stock.updatedDate || stock.manufacturedDate || null;
+
+/**
+ * Return a readable stock identifier.
+ */
+const getStockBalanceId = (stock, index) => displayValue(stock.stockBalanceId || stock.id || `Record-${index + 1}`);
+
+/**
+ * Render stock list content with optional status messages.
+ */
+const renderStockBalanceContent = (messageType, messageText, bodyHtml = '') => {
+  const alertClassMap = {
+    success: 'alert-success',
+    info: 'alert-info',
+    error: 'alert-danger'
+  };
+
+  const alertClass = alertClassMap[messageType] || 'alert-info';
+
+  elements.contentHost.innerHTML = `
+    <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
+      <div class="alert ${alertClass} mb-0" role="alert">${messageText}</div>
+      <div class="stock-list-scroll">${bodyHtml}</div>
+    </section>
+  `;
+};
+
+/**
+ * Build a long stock summary card for list view.
+ */
+const createStockSummaryCard = (stock, index) => `
+  <article class="stock-summary-card" role="button" tabindex="0" data-stock-index="${index}">
     <div class="row g-3 align-items-center">
-      <div class="col-12 col-md-4">
-        <p class="small text-muted mb-1">Report ID</p>
-        <p class="fw-semibold theme-text mb-0">${report.reportId}</p>
+      <div class="col-12 col-md-3">
+        <p class="small text-muted mb-1">Stock Balance ID</p>
+        <p class="fw-semibold theme-text mb-0">${getStockBalanceId(stock, index)}</p>
       </div>
-      <div class="col-12 col-md-4">
-        <p class="small text-muted mb-1">Logistic Officer Name</p>
-        <p class="mb-0">${report.logisticOfficerName}</p>
+      <div class="col-12 col-md-5">
+        <p class="small text-muted mb-1">Storage Location</p>
+        <p class="mb-0">${displayValue(stock.storageLocation)}</p>
       </div>
       <div class="col-12 col-md-4 text-md-end">
         <p class="small text-muted mb-1">Reported Date</p>
-        <p class="mb-0">${formatDate(report.reportedDate)}</p>
+        <p class="mb-0">${formatStockDateTime(getReportedDateValue(stock))}</p>
       </div>
     </div>
   </article>
 `;
 
-const createDistributionCard = (distribution) => `
-  <article class="distribution-card" role="button" tabindex="0" data-distribution-id="${distribution.distributionId}">
-    <div class="row g-3 align-items-center">
-      <div class="col-12 col-md-3">
-        <p class="small text-muted mb-1">Distribution ID</p>
-        <p class="fw-semibold theme-text mb-0">${distribution.distributionId}</p>
-      </div>
-      <div class="col-12 col-md-4">
-        <p class="small text-muted mb-1">Project Name</p>
-        <p class="mb-0">${distribution.projectName}</p>
-      </div>
-      <div class="col-12 col-md-3">
-        <p class="small text-muted mb-1">Distribution Date</p>
-        <p class="mb-0">${formatShortDate(distribution.distributionDate)}</p>
-      </div>
-      <div class="col-12 col-md-2 text-md-end">
-        <span class="status-badge ${getDistributionStatusClass(distribution.status)}">${distribution.status}</span>
-      </div>
+/**
+ * Build detailed stock card with full fields.
+ */
+const createStockDetailCard = (stock, index) => `
+  <article class="stock-card p-4">
+    <div class="row g-3">
+      <div class="col-12 col-md-6"><strong>Stock Balance ID:</strong> ${getStockBalanceId(stock, index)}</div>
+      <div class="col-12 col-md-6"><strong>Reported Date:</strong> ${formatStockDateTime(getReportedDateValue(stock))}</div>
+      <div class="col-12 col-md-6"><strong>Item Name:</strong> ${displayValue(stock.itemName)}</div>
+      <div class="col-12 col-md-6"><strong>Event Type:</strong> ${displayValue(stock.eventType)}</div>
+      <div class="col-12"><strong>Item Description:</strong> ${displayValue(stock.itemDescription)}</div>
+      <div class="col-12 col-md-6"><strong>Type:</strong> ${displayValue(stock.type)}</div>
+      <div class="col-12 col-md-6"><strong>Quantity:</strong> ${formatQuantityWithUnit(stock.quantity, stock.unitOfMeasure)}</div>
+      <div class="col-12 col-md-6"><strong>Storage Location:</strong> ${displayValue(stock.storageLocation)}</div>
+      <div class="col-12 col-md-6"><strong>Manufactured Date:</strong> ${formatStockDate(stock.manufacturedDate)}</div>
+      <div class="col-12 col-md-6"><strong>Expired Date:</strong> ${formatStockDate(stock.expiriedDate || stock.expiredDate)}</div>
     </div>
   </article>
 `;
 
-const initializeDistributionData = async () => {
-  if (!state.distributionMeta) {
-    state.distributionMeta = await fetchDistributionMeta();
-  }
+/**
+ * Render stock list cards and attach click handlers.
+ */
+const renderStockBalanceListView = (stocks) => {
+  renderStockBalanceContent(
+    'success',
+    'Stock data loaded successfully.',
+    `<section class="d-grid gap-3">${stocks.map((stock, index) => createStockSummaryCard(stock, index)).join('')}</section>`
+  );
 
-  if (!state.distributionsLoaded) {
-    state.distributions = await fetchDistributions();
-    state.distributionsLoaded = true;
+  const cards = elements.contentHost.querySelectorAll('.stock-summary-card');
+  cards.forEach((card) => {
+    const openDetail = () => {
+      const record = stocks[Number(card.dataset.stockIndex)];
+      if (record) {
+        renderStockBalanceDetailView(record, Number(card.dataset.stockIndex), stocks);
+      }
+    };
+
+    card.addEventListener('click', openDetail);
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openDetail();
+      }
+    });
+  });
+};
+
+/**
+ * Render detail view for a selected stock card.
+ */
+const renderStockBalanceDetailView = (stock, index, stocks) => {
+  renderStockBalanceContent(
+    'success',
+    'Stock data loaded successfully.',
+    `
+      <div class="mb-3">
+        <button id="backToStockListBtn" class="btn btn-outline-primary btn-sm">Back to Stock List</button>
+      </div>
+      ${createStockDetailCard(stock, index)}
+    `
+  );
+
+  const backBtn = document.getElementById('backToStockListBtn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => renderStockBalanceListView(stocks));
   }
 };
 
-const loadTownshipOptions = (stateName) => {
-  const locations = state.distributionMeta?.locationHierarchy || {};
-  return stateName ? Object.keys(locations[stateName] || {}) : [];
-};
-
-const loadVillageOptions = (stateName, townshipName) => {
-  const locations = state.distributionMeta?.locationHierarchy || {};
-  if (!stateName || !townshipName) {
-    return [];
-  }
-
-  return locations[stateName]?.[townshipName] || [];
-};
-
+/**
+ * Fetch stock list, sort by latest date, and render list view.
+ */
 const renderStockBalanceList = async () => {
   elements.pageTitle.textContent = 'Stock Balance';
-  elements.pageSubtitle.textContent = 'Latest reports sorted by reported date.';
-  elements.contentHost.innerHTML = '<div class="text-muted">Loading reports...</div>';
+  elements.pageSubtitle.textContent = 'Stock balance records sorted by latest reported date.';
+  renderStockBalanceContent('info', 'Loading stock data...');
 
   try {
-    if (!state.reportsLoaded) {
-      state.reports = await fetchStockBalanceReports();
-      state.reportsLoaded = true;
+    const response = await fetch(STOCK_API_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    if (!state.reports.length) {
-      elements.contentHost.innerHTML = '<div class="alert alert-info">No Stock Balance Reports Available</div>';
+    const payload = await response.json();
+    const stocks = normalizeStockInfo(payload).sort((left, right) => {
+      const leftDate = new Date(getReportedDateValue(left) || 0).getTime();
+      const rightDate = new Date(getReportedDateValue(right) || 0).getTime();
+      return rightDate - leftDate;
+    });
+
+    if (!stocks.length) {
+      renderStockBalanceContent('info', 'No stock data available.');
       return;
     }
 
-    elements.contentHost.innerHTML = `
-      <section class="report-list">
-        ${state.reports.map((report) => createReportCard(report)).join('')}
-      </section>
-    `;
-
-    const cards = elements.contentHost.querySelectorAll('.report-card');
-    cards.forEach((card) => {
-      const openDetail = () => {
-        window.location.hash = `#/stock-balance/${encodeURIComponent(card.dataset.reportId)}`;
-      };
-
-      card.addEventListener('click', openDetail);
-      card.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openDetail();
-        }
-      });
-    });
+    renderStockBalanceListView(stocks);
   } catch {
-    elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to load reports. Please try again later.</div>';
-  }
-};
-
-const renderStockBalanceDetail = async (reportId) => {
-  elements.pageTitle.textContent = 'Stock Balance Detail';
-  elements.pageSubtitle.textContent = 'Detailed stock balance report view.';
-
-  if (!reportId) {
-    elements.contentHost.innerHTML = '<div class="alert alert-danger">Invalid report ID. Please select a valid report.</div>';
-    return;
-  }
-
-  elements.contentHost.innerHTML = '<div class="text-muted">Loading report detail...</div>';
-
-  try {
-    const report = await fetchStockBalanceReportById(reportId);
-    const rows = report.items
-      .map(
-        (item) => `
-          <tr>
-            <td>${item.itemName}</td>
-            <td>${item.category}</td>
-            <td>${item.quantityAvailable}</td>
-            <td>${item.unit}</td>
-          </tr>
-        `
-      )
-      .join('');
-
-    elements.contentHost.innerHTML = `
-      <button id="backToReportsBtn" class="btn btn-outline-primary btn-sm mb-3">Back to Reports</button>
-
-      <article class="detail-card p-4">
-        <div class="row g-3 mb-3">
-          <div class="col-12 col-md-6"><strong>Report ID:</strong> ${report.reportId}</div>
-          <div class="col-12 col-md-6"><strong>Logistic Officer Name:</strong> ${report.logisticOfficerName}</div>
-          <div class="col-12 col-md-6"><strong>Reported Date:</strong> ${formatDate(report.reportedDate)}</div>
-          <div class="col-12 col-md-6"><strong>Warehouse Name:</strong> ${report.warehouseName || 'N/A'}</div>
-          <div class="col-12 col-md-6"><strong>Total Item Count:</strong> ${report.items.length}</div>
-          <div class="col-12 col-md-6"><strong>Generated Timestamp:</strong> ${formatDate(report.generatedTimestamp)}</div>
-        </div>
-
-        <div class="table-responsive">
-          <table class="table table-striped align-middle mb-0">
-            <thead>
-              <tr>
-                <th>Item Name</th>
-                <th>Category</th>
-                <th>Quantity</th>
-                <th>Unit</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </article>
-    `;
-
-    document.getElementById('backToReportsBtn').addEventListener('click', () => {
-      window.location.hash = '#/stock-balance';
-    });
-  } catch (error) {
-    const message =
-      error.message === 'invalid_report_id'
-        ? 'Invalid report ID. The selected stock balance report was not found.'
-        : 'Unable to load report details right now. Please try again later.';
-
-    elements.contentHost.innerHTML = `<div class="alert alert-danger">${message}</div>`;
+    renderStockBalanceContent('error', 'Failed to load stock data.');
   }
 };
 
@@ -1186,11 +1249,6 @@ const renderRoute = async () => {
 
   const { mainRoute, routeParam } = parseRoute();
   setActiveNav(mainRoute === 'stock-balance' ? 'stock-balance' : mainRoute);
-
-  if (mainRoute === 'stock-balance' && routeParam) {
-    await renderStockBalanceDetail(decodeURIComponent(routeParam));
-    return;
-  }
 
   if (mainRoute === 'stock-balance') {
     await renderStockBalanceList();
