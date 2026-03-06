@@ -218,10 +218,33 @@ const loadVillageOptions = (stateName, townshipName) => {
   return locations[stateName]?.[townshipName] || [];
 };
 
+// Render Stock Balance state message + cards in a consistent SPA layout.
+const renderStockBalanceContent = (messageType, messageText, stockInfo = []) => {
+  const alertClassMap = {
+    success: 'alert-success',
+    info: 'alert-info',
+    error: 'alert-danger'
+  };
+
+  const alertClass = alertClassMap[messageType] || 'alert-info';
+
+  elements.contentHost.innerHTML = `
+    <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
+      <div class="alert ${alertClass} mb-0" role="alert">${messageText}</div>
+      <div class="stock-list-scroll">
+        <div class="row g-3">
+          ${stockInfo.map((stock) => createStockCard(stock)).join('')}
+        </div>
+      </div>
+    </section>
+  `;
+};
+
+// Fetch stock data from API and render cards with frontend status messages.
 const renderStockBalanceList = async () => {
   elements.pageTitle.textContent = 'Stock Balance';
   elements.pageSubtitle.textContent = 'Current stock details from the API.';
-  elements.contentHost.innerHTML = '<div class="text-muted">Loading stock data...</div>';
+  renderStockBalanceContent('info', 'Loading stock data...');
 
   try {
     const response = await fetch(STOCK_API_URL);
@@ -232,24 +255,14 @@ const renderStockBalanceList = async () => {
     const responseData = await response.json();
     const stockInfo = Array.isArray(responseData?.data?.stockInfo) ? responseData.data.stockInfo : [];
 
-    elements.contentHost.innerHTML = `
-      <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
-        <div class="stock-list-scroll">
-          <div class="row g-3">
-            ${stockInfo.map((stock) => createStockCard(stock)).join('')}
-          </div>
-        </div>
-      </section>
-    `;
+    if (!stockInfo.length) {
+      renderStockBalanceContent('info', 'No stock data available.');
+      return;
+    }
+
+    renderStockBalanceContent('success', 'Stock data loaded successfully.', stockInfo);
   } catch {
-    console.error('Failed to load stock data');
-    elements.contentHost.innerHTML = `
-      <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
-        <div class="stock-list-scroll">
-          <div class="row g-3"></div>
-        </div>
-      </section>
-    `;
+    renderStockBalanceContent('error', 'Failed to load stock data.');
   }
 };
 
