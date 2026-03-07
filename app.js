@@ -511,8 +511,9 @@ const renderAssignLocationPage = async () => {
     const tableRows = locations.length
       ? locations
           .map(
-            (location) => `
+            (location, index) => `
               <tr>
+                <td>${index + 1}</td>
                 <td>${displayValue(location.locationName)}</td>
                 <td>${displayValue(displayAssignedStaff(location))}</td>
                 <td>
@@ -525,7 +526,7 @@ const renderAssignLocationPage = async () => {
             `
           )
           .join('')
-      : '<tr><td colspan="3" class="text-center text-muted py-4">No assigned locations found.</td></tr>';
+      : '<tr><td colspan="4" class="text-center text-muted py-4">No assigned locations found.</td></tr>';
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 assign-location-shell d-flex flex-column gap-3">
@@ -541,6 +542,7 @@ const renderAssignLocationPage = async () => {
           <table class="table table-hover align-middle mb-0 assign-location-table">
             <thead class="table-light">
               <tr>
+                <th scope="col">No</th>
                 <th scope="col">Location Name</th>
                 <th scope="col">Assigned Staff</th>
                 <th scope="col" class="text-nowrap">Actions</th>
@@ -832,6 +834,7 @@ const renderAssignDistributionPage = async () => {
                 <td>${index + 1}</td>
                 <td>${displayValue(row.locationName)}</td>
                 <td>${displayValue(row.eventType)}</td>
+                <td>${formatStockDateTime(row.distributionDate)}</td>
                 <td><span class="badge ${isCompleted ? 'text-bg-success' : 'text-bg-warning'}">${derivedStatus}</span></td>
                 <td>
                   <div class="d-flex flex-wrap gap-2">
@@ -847,7 +850,7 @@ const renderAssignDistributionPage = async () => {
             `;
           })
           .join('')
-      : '<tr><td colspan="5" class="text-center text-muted py-4">No assigned distributions found.</td></tr>';
+      : '<tr><td colspan="6" class="text-center text-muted py-4">No assigned distributions found.</td></tr>';
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 assign-distribution-shell d-flex flex-column gap-3">
@@ -866,6 +869,7 @@ const renderAssignDistributionPage = async () => {
                 <th scope="col">No</th>
                 <th scope="col">Location Name</th>
                 <th scope="col">Event Type</th>
+                <th scope="col">Distribution Date</th>
                 <th scope="col">Status</th>
                 <th scope="col" class="text-nowrap">Action</th>
               </tr>
