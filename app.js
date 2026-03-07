@@ -965,10 +965,11 @@ const normalizeBeneficiaries = (payload) => {
 
   return source.map((item, index) => ({
     id: item.id ?? item.beneficiaryId ?? item.beneficiaryID ?? item.userId ?? index,
-    beneficiaryName: item.beneficiaryName ?? item.name ?? item.fullName ?? item.beneficiary?.name ?? 'Unknown Beneficiary',
+    beneficiaryName: item.beneficiaryName ?? item.beneficName ?? item.name ?? item.fullName ?? item.beneficiary?.name ?? 'Unknown Beneficiary',
     fatherName: item.fatherName ?? item.parentName ?? item.father ?? item.guardianName,
     contact: item.contact ?? item.phone ?? item.phoneNo ?? item.mobile,
-    locationName: item.locationName ?? item.location?.locationName ?? item.location?.name ?? 'Unknown Location'
+    locationId: item.locationId ?? item.location?.locationId ?? item.location?.id,
+    locationName: item.locationName ?? item.location?.locationName ?? item.location?.name
   }));
 };
 
@@ -992,13 +993,32 @@ const renderManageBeneficiaryPage = async () => {
   elements.contentHost.innerHTML = '<div class="text-muted">Loading beneficiaries...</div>';
 
   try {
-    const response = await fetch(BENEFICIARY_API_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    const [beneficiaryResponse, locationResponse] = await Promise.all([
+      fetch(BENEFICIARY_API_URL),
+      fetch(LOCATION_API_URL)
+    ]);
+
+    if (!beneficiaryResponse.ok) {
+      throw new Error(`HTTP ${beneficiaryResponse.status}`);
     }
 
-    const beneficiaries = normalizeBeneficiaries(await response.json());
-    const grouped = groupBeneficiariesByLocation(beneficiaries);
+    if (!locationResponse.ok) {
+      throw new Error(`HTTP ${locationResponse.status}`);
+    }
+
+    const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
+    const locations = normalizeLocations(await locationResponse.json());
+    const locationNameById = new Map(
+      locations
+        .filter((location) => location.locationId !== undefined && location.locationId !== null)
+        .map((location) => [String(location.locationId), location.locationName])
+    );
+
+    const beneficiariesWithLocationName = beneficiaries.map((beneficiary) => ({
+      ...beneficiary,
+      locationName: beneficiary.locationName ?? locationNameById.get(String(beneficiary.locationId)) ?? 'Unknown Location'
+    }));
+    const grouped = groupBeneficiariesByLocation(beneficiariesWithLocationName);
     const locationNames = Object.keys(grouped);
 
     const selectedLocation = state.selectedBeneficiaryLocation && grouped[state.selectedBeneficiaryLocation]
