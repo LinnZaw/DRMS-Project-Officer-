@@ -26,7 +26,7 @@ const LOCATION_API_URL = 'http://localhost:8080/api/locations';
 const USER_API_URL = 'http://localhost:8080/api/users';
 const ROLE_API_URL = 'http://localhost:8080/api/roles';
 const ASSIGN_DISTRIBUTION_API_URL = 'http://localhost:8080/api/assign-distributions';
-const LOCATION_CREATOR_ID = 1;
+const LOCATION_CREATOR_ID = 2;
 const PROJECT_OFFICER_ID = 2;
 
 const setAuthView = () => {
