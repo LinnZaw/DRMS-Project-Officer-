@@ -1,6 +1,9 @@
 const state = {
   isAuthenticated: false,
-  assignLocationFlash: null
+  assignLocationFlash: null,
+  roleLookupLoaded: false,
+  roleLookup: [],
+  fieldStaffRoleId: null
 };
 
 const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
@@ -20,6 +23,7 @@ const elements = {
 const STOCK_API_URL = 'http://localhost:8080/api/stocks';
 const LOCATION_API_URL = 'http://localhost:8080/api/locations';
 const USER_API_URL = 'http://localhost:8080/api/users';
+const ROLE_API_URL = 'http://localhost:8080/api/roles';
 const LOCATION_CREATOR_ID = 1;
 
 const setAuthView = () => {
@@ -261,16 +265,18 @@ const normalizeUsers = (payload) => {
     return [];
   }
 
-  return source.map((user) => {
-    const userId = user.userId ?? user.id;
-    const composedName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-    const userName = user.name || user.userName || user.username || composedName || `User ${displayValue(userId)}`;
+  return source
+    .map((user) => {
+      const userId = user.userId ?? user.id;
+      const composedName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      const userName = user.name || user.userName || user.username || composedName || `User ${displayValue(userId)}`;
 
-    return {
-      userId,
-      userName
-    };
-  });
+      return {
+        userId,
+        userName
+      };
+    })
+    .filter((user) => user.userId !== undefined && user.userId !== null);
 };
 
 const normalizeLocations = (payload) => {
@@ -288,12 +294,72 @@ const normalizeLocations = (payload) => {
   }));
 };
 
-const findUserName = (users, staffId, fallback) => {
-  const matched = users.find((user) => String(user.userId) === String(staffId));
-  return matched?.userName || fallback || 'Unassigned';
+const normalizeRoles = (payload) => {
+  const source = payload?.data?.roles ?? payload?.data ?? payload;
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((role) => ({
+    roleId: role.roleId ?? role.id,
+    roleName: String(role.roleName ?? role.name ?? '').toUpperCase()
+  }));
 };
 
-const showAssignLocationModal = ({ mode, users, location, onSuccess }) => {
+const ensureRoleLookup = async () => {
+  if (state.roleLookupLoaded) {
+    return state.roleLookup;
+  }
+
+  const response = await fetch(ROLE_API_URL);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  state.roleLookup = normalizeRoles(await response.json());
+  state.roleLookupLoaded = true;
+  return state.roleLookup;
+};
+
+const getFieldStaffRoleId = async () => {
+  if (state.fieldStaffRoleId !== null) {
+    return state.fieldStaffRoleId;
+  }
+
+  const roles = await ensureRoleLookup();
+  const fieldStaffRole = roles.find((role) => role.roleName === 'FIELD_STAFF');
+  if (!fieldStaffRole?.roleId) {
+    throw new Error('field_staff_role_not_found');
+  }
+
+  state.fieldStaffRoleId = fieldStaffRole.roleId;
+  return state.fieldStaffRoleId;
+};
+
+const fetchFieldStaffUsers = async () => {
+  const roleId = await getFieldStaffRoleId();
+  const response = await fetch(`${USER_API_URL}?role=${encodeURIComponent(roleId)}`);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return normalizeUsers(await response.json());
+};
+
+const displayAssignedStaff = (location) => {
+  if (location.staffName) {
+    return location.staffName;
+  }
+
+  if (location.staffId !== undefined && location.staffId !== null && location.staffId !== '') {
+    return `Staff ID: ${location.staffId}`;
+  }
+
+  return 'Unassigned';
+};
+
+const showAssignLocationModal = ({ mode, users = [], location, onSuccess }) => {
   const isEdit = mode === 'edit';
   const modalWrapper = document.createElement('div');
   modalWrapper.innerHTML = `
@@ -312,15 +378,9 @@ const showAssignLocationModal = ({ mode, users, location, onSuccess }) => {
                 <input id="locationNameInput" name="locationName" type="text" class="form-control" required value="${isEdit ? location.locationName : ''}" />
               </div>
               <div class="mb-0">
-                <label class="form-label" for="staffIdInput">User</label>
+                <label class="form-label" for="staffIdInput">Field Staff</label>
                 <select id="staffIdInput" name="staffId" class="form-select" required>
-                  <option value="">Select user</option>
-                  ${users
-                    .map(
-                      (user) =>
-                        `<option value="${user.userId}" ${String(user.userId) === String(location?.staffId || '') ? 'selected' : ''}>${user.userName}</option>`
-                    )
-                    .join('')}
+                  <option value="">Loading field staff...</option>
                 </select>
               </div>
             </div>
@@ -339,12 +399,43 @@ const showAssignLocationModal = ({ mode, users, location, onSuccess }) => {
   const modalElement = modalWrapper.querySelector('#assignLocationModal');
   const form = modalWrapper.querySelector('#assignLocationForm');
   const alertBox = modalWrapper.querySelector('#assignLocationModalAlert');
+  const staffSelect = modalWrapper.querySelector('#staffIdInput');
+  const submitBtn = form.querySelector('button[type="submit"]');
   const bootstrapModal = new bootstrap.Modal(modalElement);
 
   const showAlert = (type, message) => {
     alertBox.className = `alert alert-${type}`;
     alertBox.textContent = message;
   };
+
+  const populateStaffSelect = (staffUsers) => {
+    if (!staffUsers.length) {
+      staffSelect.innerHTML = '<option value="">No field staff available</option>';
+      submitBtn.disabled = true;
+      showAlert('warning', 'No FIELD_STAFF users found.');
+      return;
+    }
+
+    const selectedStaffId = String(location?.staffId || '');
+    staffSelect.innerHTML = `
+      <option value="">Select Field Staff</option>
+      ${staffUsers
+        .map((user) => `<option value="${user.userId}" ${String(user.userId) === selectedStaffId ? 'selected' : ''}>${user.userName}</option>`)
+        .join('')}
+    `;
+    submitBtn.disabled = false;
+  };
+
+  (async () => {
+    try {
+      const staffUsers = users.length ? users : await fetchFieldStaffUsers();
+      populateStaffSelect(staffUsers);
+    } catch {
+      staffSelect.innerHTML = '<option value="">Failed to load field staff</option>';
+      submitBtn.disabled = true;
+      showAlert('danger', 'Unable to load roles/field staff. Please try again.');
+    }
+  })();
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -406,13 +497,12 @@ const renderAssignLocationPage = async () => {
   elements.contentHost.innerHTML = '<div class="text-muted">Loading assigned locations...</div>';
 
   try {
-    const [usersResponse, locationsResponse] = await Promise.all([fetch(USER_API_URL), fetch(LOCATION_API_URL)]);
+    const locationsResponse = await fetch(LOCATION_API_URL);
 
-    if (!usersResponse.ok || !locationsResponse.ok) {
+    if (!locationsResponse.ok) {
       throw new Error('request_failed');
     }
 
-    const users = normalizeUsers(await usersResponse.json());
     const locations = normalizeLocations(await locationsResponse.json());
 
     const tableRows = locations.length
@@ -421,7 +511,7 @@ const renderAssignLocationPage = async () => {
             (location) => `
               <tr>
                 <td>${displayValue(location.locationName)}</td>
-                <td>${displayValue(findUserName(users, location.staffId, location.staffName))}</td>
+                <td>${displayValue(displayAssignedStaff(location))}</td>
                 <td>
                   <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-outline-primary btn-sm" data-action="edit" data-location-id="${location.locationId}">Update</button>
@@ -467,14 +557,14 @@ const renderAssignLocationPage = async () => {
 
     const createBtn = document.getElementById('createAssignBtn');
     createBtn.addEventListener('click', () => {
-      showAssignLocationModal({ mode: 'create', users, onSuccess: rerender });
+      showAssignLocationModal({ mode: 'create', onSuccess: rerender });
     });
 
     elements.contentHost.querySelectorAll('[data-action="edit"]').forEach((button) => {
       button.addEventListener('click', () => {
         const location = locations.find((item) => String(item.locationId) === button.dataset.locationId);
         if (!location) return;
-        showAssignLocationModal({ mode: 'edit', users, location, onSuccess: rerender });
+        showAssignLocationModal({ mode: 'edit', location, onSuccess: rerender });
       });
     });
 
