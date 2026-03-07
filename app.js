@@ -3,7 +3,8 @@ const state = {
   assignLocationFlash: null,
   roleLookupLoaded: false,
   roleLookup: [],
-  fieldStaffRoleId: null
+  fieldStaffRoleId: null,
+  assignDistributionFlash: null
 };
 
 const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
@@ -24,7 +25,9 @@ const STOCK_API_URL = 'http://localhost:8080/api/stocks';
 const LOCATION_API_URL = 'http://localhost:8080/api/locations';
 const USER_API_URL = 'http://localhost:8080/api/users';
 const ROLE_API_URL = 'http://localhost:8080/api/roles';
+const ASSIGN_DISTRIBUTION_API_URL = 'http://localhost:8080/api/assign-distributions';
 const LOCATION_CREATOR_ID = 1;
+const PROJECT_OFFICER_ID = 2;
 
 const setAuthView = () => {
   elements.loginView.classList.toggle('d-none', state.isAuthenticated);
@@ -604,11 +607,345 @@ const renderAssignLocationPage = async () => {
   }
 };
 
+
+const normalizeAssignDistributions = (payload) => {
+  const source = payload?.data?.assignDistributions ?? payload?.data ?? payload;
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((item) => ({
+    id: item.id,
+    userId: item.userId,
+    locationId: item.locationId,
+    locationName: item.locationName ?? item.location?.locationName ?? 'N/A',
+    eventType: item.eventType ?? 'N/A',
+    distributionDate: item.distributionDate,
+    status: item.status ?? 'Pending'
+  }));
+};
+
+const getDerivedDistributionStatus = (distributionDate, fallbackStatus = 'Pending') => {
+  if (!distributionDate) {
+    return fallbackStatus;
+  }
+
+  const assignedDate = new Date(distributionDate);
+  if (Number.isNaN(assignedDate.getTime())) {
+    return fallbackStatus;
+  }
+
+  const completionDate = new Date(assignedDate);
+  completionDate.setDate(completionDate.getDate() + 1);
+  completionDate.setHours(12, 0, 0, 0);
+
+  if (new Date() >= completionDate) {
+    return 'Completed';
+  }
+
+  return 'Assigned';
+};
+
+const fetchDistributionLocations = async () => {
+  const response = await fetch(LOCATION_API_URL);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return normalizeLocations(await response.json());
+};
+
+const showAssignDistributionModal = ({ mode, distribution, onSuccess }) => {
+  const isEdit = mode === 'edit';
+  const modalWrapper = document.createElement('div');
+  const defaultDate = (() => {
+    if (isEdit && distribution?.distributionDate) {
+      const parsed = new Date(distribution.distributionDate);
+      if (!Number.isNaN(parsed.getTime())) {
+        const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 16);
+      }
+    }
+    return '';
+  })();
+
+  modalWrapper.innerHTML = `
+    <div class="modal fade" id="assignDistributionModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">${isEdit ? 'Update Assign Distribution' : 'Create Assign Distribution'}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form id="assignDistributionForm" novalidate>
+            <div class="modal-body">
+              <div id="assignDistributionModalAlert" class="alert d-none" role="alert"></div>
+              <div class="mb-3">
+                <label class="form-label" for="distributionDateInput">Distribution Date</label>
+                <input id="distributionDateInput" name="distributionDate" type="datetime-local" class="form-control" required value="${defaultDate}" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="distributionEventTypeInput">Event Type</label>
+                <select id="distributionEventTypeInput" name="eventType" class="form-select" required>
+                  <option value="">Select event type</option>
+                  ${['Flood', 'Earthquake', 'Cyclone', 'Landslide', 'Fire', 'Storm']
+                    .map((eventType) => `<option value="${eventType}" ${distribution?.eventType === eventType ? 'selected' : ''}>${eventType}</option>`)
+                    .join('')}
+                </select>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="distributionLocationInput">Location</label>
+                <select id="distributionLocationInput" name="locationId" class="form-select" required>
+                  <option value="">Loading locations...</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-theme">${isEdit ? 'Update' : 'Create'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalWrapper);
+
+  const modalElement = modalWrapper.querySelector('#assignDistributionModal');
+  const form = modalWrapper.querySelector('#assignDistributionForm');
+  const alertBox = modalWrapper.querySelector('#assignDistributionModalAlert');
+  const locationSelect = modalWrapper.querySelector('#distributionLocationInput');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const bootstrapModal = new bootstrap.Modal(modalElement);
+
+  const showAlert = (type, message) => {
+    alertBox.className = `alert alert-${type}`;
+    alertBox.textContent = message;
+  };
+
+  (async () => {
+    try {
+      const locations = await fetchDistributionLocations();
+      if (!locations.length) {
+        locationSelect.innerHTML = '<option value="">No locations available</option>';
+        submitBtn.disabled = true;
+        showAlert('warning', 'No locations found. Please create a location first.');
+        return;
+      }
+
+      locationSelect.innerHTML = `
+        <option value="">Select location</option>
+        ${locations
+          .map(
+            (location) =>
+              `<option value="${location.locationId}" ${String(location.locationId) === String(distribution?.locationId || '') ? 'selected' : ''}>${location.locationName}</option>`
+          )
+          .join('')}
+      `;
+      submitBtn.disabled = false;
+    } catch {
+      locationSelect.innerHTML = '<option value="">Failed to load locations</option>';
+      submitBtn.disabled = true;
+      showAlert('danger', 'Unable to load locations. Please try again.');
+    }
+  })();
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!form.checkValidity()) {
+      form.classList.add('was-validated');
+      return;
+    }
+
+    const payload = {
+      distributionDate: new Date(form.distributionDate.value).toISOString(),
+      eventType: form.eventType.value,
+      status: 'Pending',
+      userId: distribution?.userId ?? PROJECT_OFFICER_ID,
+      locationId: Number(form.locationId.value)
+    };
+
+    try {
+      const endpoint = isEdit
+        ? `${ASSIGN_DISTRIBUTION_API_URL}/${encodeURIComponent(distribution?.userId ?? PROJECT_OFFICER_ID)}`
+        : `${ASSIGN_DISTRIBUTION_API_URL}?userId=${encodeURIComponent(PROJECT_OFFICER_ID)}`;
+      const method = isEdit ? 'PATCH' : 'POST';
+
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      state.assignDistributionFlash = {
+        type: 'success',
+        text: isEdit ? 'Assigned distribution updated successfully.' : 'Assigned distribution created successfully.'
+      };
+      bootstrapModal.hide();
+      await onSuccess();
+    } catch {
+      showAlert('danger', isEdit ? 'Failed to update assigned distribution.' : 'Failed to create assigned distribution.');
+    }
+  });
+
+  modalElement.addEventListener('hidden.bs.modal', () => {
+    bootstrapModal.dispose();
+    modalWrapper.remove();
+  });
+
+  bootstrapModal.show();
+};
+
+const renderAssignDistributionPage = async () => {
+  elements.pageTitle.textContent = 'Assign Distribution';
+  elements.pageSubtitle.textContent = 'Manage assigned distributions and track status by date.';
+
+  const flash = state.assignDistributionFlash;
+  state.assignDistributionFlash = null;
+
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading assigned distributions...</div>';
+
+  try {
+    const response = await fetch(ASSIGN_DISTRIBUTION_API_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const rows = normalizeAssignDistributions(await response.json());
+
+    const tableRows = rows.length
+      ? rows
+          .map((row, index) => {
+            const derivedStatus = getDerivedDistributionStatus(row.distributionDate, row.status);
+            const isCompleted = derivedStatus === 'Completed';
+            return `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${displayValue(row.locationName)}</td>
+                <td>${displayValue(row.eventType)}</td>
+                <td><span class="badge ${isCompleted ? 'text-bg-success' : 'text-bg-warning'}">${derivedStatus}</span></td>
+                <td>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-primary btn-sm" data-action="update-distribution" data-row-index="${index}" ${isCompleted ? 'disabled' : ''}>
+                      ✏️ Update
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" data-action="delete-distribution" data-row-index="${index}">
+                      🗑️ Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join('')
+      : '<tr><td colspan="5" class="text-center text-muted py-4">No assigned distributions found.</td></tr>';
+
+    elements.contentHost.innerHTML = `
+      <section class="fixed-page-shell mx-auto w-100 assign-distribution-shell d-flex flex-column gap-3">
+        ${
+          flash
+            ? `<div class="alert alert-${flash.type} mb-0" role="alert">${flash.text}</div>`
+            : ''
+        }
+        <div class="d-flex justify-content-end">
+          <button id="createAssignDistributionBtn" class="btn btn-theme">Create Assign Distribution</button>
+        </div>
+        <div class="table-responsive assign-distribution-table-wrap">
+          <table class="table table-hover align-middle mb-0 assign-distribution-table">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">No</th>
+                <th scope="col">Location Name</th>
+                <th scope="col">Event Type</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="text-nowrap">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+
+    const rerender = async () => {
+      await renderAssignDistributionPage();
+    };
+
+    document.getElementById('createAssignDistributionBtn').addEventListener('click', () => {
+      showAssignDistributionModal({ mode: 'create', onSuccess: rerender });
+    });
+
+    elements.contentHost.querySelectorAll('[data-action="update-distribution"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const row = rows[Number(button.dataset.rowIndex)];
+        if (!row) return;
+
+        const status = getDerivedDistributionStatus(row.distributionDate, row.status);
+        if (status === 'Completed') {
+          state.assignDistributionFlash = {
+            type: 'warning',
+            text: 'Completed distributions cannot be edited.'
+          };
+          rerender();
+          return;
+        }
+
+        showAssignDistributionModal({ mode: 'edit', distribution: row, onSuccess: rerender });
+      });
+    });
+
+    elements.contentHost.querySelectorAll('[data-action="delete-distribution"]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const row = rows[Number(button.dataset.rowIndex)];
+        if (!row) return;
+
+        const confirmed = window.confirm(`Delete assigned distribution for ${row.locationName}?`);
+        if (!confirmed) return;
+
+        try {
+          const response = await fetch(`${ASSIGN_DISTRIBUTION_API_URL}/${encodeURIComponent(row.userId ?? PROJECT_OFFICER_ID)}`, {
+            method: 'DELETE'
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          state.assignDistributionFlash = {
+            type: 'success',
+            text: 'Assigned distribution deleted successfully.'
+          };
+          await rerender();
+        } catch {
+          state.assignDistributionFlash = {
+            type: 'danger',
+            text: 'Failed to delete assigned distribution.'
+          };
+          await rerender();
+        }
+      });
+    });
+  } catch {
+    elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to load assigned distributions. Please try again later.</div>';
+  }
+};
+
 const renderRoute = async () => {
   if (!state.isAuthenticated) return;
 
   const { mainRoute } = parseRoute();
-  setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' ? mainRoute : 'dashboard');
+  setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' || mainRoute === 'assign-distribution' ? mainRoute : 'dashboard');
 
   if (mainRoute === 'stock-balance') {
     await renderStockBalanceList();
@@ -617,6 +954,11 @@ const renderRoute = async () => {
 
   if (mainRoute === 'assign-location') {
     await renderAssignLocationPage();
+    return;
+  }
+
+  if (mainRoute === 'assign-distribution') {
+    await renderAssignDistributionPage();
     return;
   }
 
