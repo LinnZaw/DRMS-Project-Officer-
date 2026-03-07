@@ -511,8 +511,9 @@ const renderAssignLocationPage = async () => {
     const tableRows = locations.length
       ? locations
           .map(
-            (location) => `
+            (location, index) => `
               <tr>
+                <td>${index + 1}</td>
                 <td>${displayValue(location.locationName)}</td>
                 <td>${displayValue(displayAssignedStaff(location))}</td>
                 <td>
@@ -525,7 +526,7 @@ const renderAssignLocationPage = async () => {
             `
           )
           .join('')
-      : '<tr><td colspan="3" class="text-center text-muted py-4">No assigned locations found.</td></tr>';
+      : '<tr><td colspan="4" class="text-center text-muted py-4">No assigned locations found.</td></tr>';
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 assign-location-shell d-flex flex-column gap-3">
@@ -541,6 +542,7 @@ const renderAssignLocationPage = async () => {
           <table class="table table-hover align-middle mb-0 assign-location-table">
             <thead class="table-light">
               <tr>
+                <th scope="col">No</th>
                 <th scope="col">Location Name</th>
                 <th scope="col">Assigned Staff</th>
                 <th scope="col" class="text-nowrap">Actions</th>
