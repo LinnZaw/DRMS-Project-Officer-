@@ -1,5 +1,6 @@
 const state = {
-  isAuthenticated: false
+  isAuthenticated: false,
+  assignLocationFlash: null
 };
 
 const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
@@ -17,29 +18,9 @@ const elements = {
 };
 
 const STOCK_API_URL = 'http://localhost:8080/api/stocks';
-
-const formatDate = (value) =>
-  new Date(value).toLocaleString('en-GB', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-
-const formatShortDate = (value) =>
-  new Date(value).toLocaleDateString('en-GB', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit'
-  });
-
-const getTodayDateValue = () => {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  const localTime = new Date(now.getTime() - offset * 60000);
-  return localTime.toISOString().split('T')[0];
-};
+const LOCATION_API_URL = 'http://localhost:8080/api/locations';
+const USER_API_URL = 'http://localhost:8080/api/users';
+const LOCATION_CREATOR_ID = 1;
 
 const setAuthView = () => {
   elements.loginView.classList.toggle('d-none', state.isAuthenticated);
@@ -73,20 +54,6 @@ const renderDashboardOverview = () => {
   `;
 };
 
-const renderPlaceholder = (title) => {
-  elements.pageTitle.textContent = title;
-  elements.pageSubtitle.textContent = 'Module is ready for integration.';
-  elements.contentHost.innerHTML = `
-    <article class="placeholder-card p-4">
-      <h4 class="theme-text h6 mb-2">${title}</h4>
-      <p class="mb-0 text-muted">This section is part of the SPA layout and can be connected to backend APIs later.</p>
-    </article>
-  `;
-};
-
-/**
- * Return fallback text for empty/null values.
- */
 const displayValue = (value) => {
   if (value === undefined || value === null || value === '') {
     return 'N/A';
@@ -95,9 +62,6 @@ const displayValue = (value) => {
   return value;
 };
 
-/**
- * Format stock dates for readable UI.
- */
 const formatStockDate = (value) => {
   if (!value) return 'N/A';
 
@@ -113,9 +77,6 @@ const formatStockDate = (value) => {
   });
 };
 
-/**
- * Format stock date+time values for list cards.
- */
 const formatStockDateTime = (value) => {
   if (!value) return 'N/A';
 
@@ -133,9 +94,6 @@ const formatStockDateTime = (value) => {
   });
 };
 
-/**
- * Build quantity + unit text.
- */
 const formatQuantityWithUnit = (quantity, unit) => {
   const quantityText = displayValue(quantity);
   const unitText = displayValue(unit);
@@ -151,9 +109,6 @@ const formatQuantityWithUnit = (quantity, unit) => {
   return `${quantityText} ${unitText}`;
 };
 
-/**
- * Normalize API payload to an array of stock records.
- */
 const normalizeStockInfo = (payload) => {
   const source = payload?.data?.stockInfos ?? payload?.data ?? payload;
 
@@ -168,19 +123,10 @@ const normalizeStockInfo = (payload) => {
   return [];
 };
 
-/**
- * Return a date value used for sorting stock cards (latest first).
- */
 const getReportedDateValue = (stock) => stock.reportedDate || stock.createdDate || stock.updatedDate || stock.manufacturedDate || null;
 
-/**
- * Return a readable stock identifier.
- */
 const getStockBalanceId = (stock, index) => displayValue(stock.stockBalanceId || stock.id || `Record-${index + 1}`);
 
-/**
- * Render stock list content with optional status messages.
- */
 const renderStockBalanceContent = (messageType, messageText, bodyHtml = '') => {
   const alertClassMap = {
     success: 'alert-success',
@@ -198,9 +144,6 @@ const renderStockBalanceContent = (messageType, messageText, bodyHtml = '') => {
   `;
 };
 
-/**
- * Build a long stock summary card for list view.
- */
 const createStockSummaryCard = (stock, index) => `
   <article class="stock-summary-card" role="button" tabindex="0" data-stock-index="${index}">
     <div class="row g-3 align-items-center">
@@ -220,9 +163,6 @@ const createStockSummaryCard = (stock, index) => `
   </article>
 `;
 
-/**
- * Build detailed stock card with full fields.
- */
 const createStockDetailCard = (stock, index) => `
   <article class="stock-card p-4">
     <div class="row g-3">
@@ -240,9 +180,6 @@ const createStockDetailCard = (stock, index) => `
   </article>
 `;
 
-/**
- * Render stock list cards and attach click handlers.
- */
 const renderStockBalanceListView = (stocks) => {
   renderStockBalanceContent(
     'success',
@@ -269,9 +206,6 @@ const renderStockBalanceListView = (stocks) => {
   });
 };
 
-/**
- * Render detail view for a selected stock card.
- */
 const renderStockBalanceDetailView = (stock, index, stocks) => {
   renderStockBalanceContent(
     'success',
@@ -290,9 +224,6 @@ const renderStockBalanceDetailView = (stock, index, stocks) => {
   }
 };
 
-/**
- * Fetch stock list, sort by latest date, and render list view.
- */
 const renderStockBalanceList = async () => {
   elements.pageTitle.textContent = 'Stock Balance';
   elements.pageSubtitle.textContent = 'Stock balance records sorted by latest reported date.';
@@ -323,14 +254,279 @@ const renderStockBalanceList = async () => {
   }
 };
 
+const normalizeUsers = (payload) => {
+  const source = payload?.data?.users ?? payload?.data ?? payload;
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((user) => {
+    const userId = user.userId ?? user.id;
+    const composedName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    const userName = user.name || user.userName || user.username || composedName || `User ${displayValue(userId)}`;
+
+    return {
+      userId,
+      userName
+    };
+  });
+};
+
+const normalizeLocations = (payload) => {
+  const source = payload?.data?.locations ?? payload?.data ?? payload;
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((location) => ({
+    locationId: location.locationId ?? location.id,
+    locationName: location.locationName ?? location.name ?? 'Unnamed Location',
+    staffId: location.staffId ?? location.userId ?? location.assignedStaffId,
+    staffName: location.staffName ?? location.assignedStaffName ?? location.assignedStaff
+  }));
+};
+
+const findUserName = (users, staffId, fallback) => {
+  const matched = users.find((user) => String(user.userId) === String(staffId));
+  return matched?.userName || fallback || 'Unassigned';
+};
+
+const showAssignLocationModal = ({ mode, users, location, onSuccess }) => {
+  const isEdit = mode === 'edit';
+  const modalWrapper = document.createElement('div');
+  modalWrapper.innerHTML = `
+    <div class="modal fade" id="assignLocationModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">${isEdit ? 'Update Assigned Location' : 'Create Assign Location'}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form id="assignLocationForm" novalidate>
+            <div class="modal-body">
+              <div id="assignLocationModalAlert" class="alert d-none" role="alert"></div>
+              <div class="mb-3">
+                <label class="form-label" for="locationNameInput">Location Name</label>
+                <input id="locationNameInput" name="locationName" type="text" class="form-control" required value="${isEdit ? location.locationName : ''}" />
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="staffIdInput">User</label>
+                <select id="staffIdInput" name="staffId" class="form-select" required>
+                  <option value="">Select user</option>
+                  ${users
+                    .map(
+                      (user) =>
+                        `<option value="${user.userId}" ${String(user.userId) === String(location?.staffId || '') ? 'selected' : ''}>${user.userName}</option>`
+                    )
+                    .join('')}
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-theme">${isEdit ? 'Update' : 'Create'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalWrapper);
+
+  const modalElement = modalWrapper.querySelector('#assignLocationModal');
+  const form = modalWrapper.querySelector('#assignLocationForm');
+  const alertBox = modalWrapper.querySelector('#assignLocationModalAlert');
+  const bootstrapModal = new bootstrap.Modal(modalElement);
+
+  const showAlert = (type, message) => {
+    alertBox.className = `alert alert-${type}`;
+    alertBox.textContent = message;
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!form.checkValidity()) {
+      form.classList.add('was-validated');
+      return;
+    }
+
+    const payload = {
+      locationName: form.locationName.value.trim(),
+      staffId: Number(form.staffId.value)
+    };
+
+    try {
+      const endpoint = isEdit
+        ? `${LOCATION_API_URL}/${encodeURIComponent(location.locationId)}`
+        : `${LOCATION_API_URL}/${LOCATION_CREATOR_ID}`;
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      state.assignLocationFlash = {
+        type: 'success',
+        text: isEdit ? 'Location assignment updated successfully.' : 'Location assignment created successfully.'
+      };
+      bootstrapModal.hide();
+      await onSuccess();
+    } catch {
+      showAlert('danger', isEdit ? 'Failed to update location assignment.' : 'Failed to create location assignment.');
+    }
+  });
+
+  modalElement.addEventListener('hidden.bs.modal', () => {
+    bootstrapModal.dispose();
+    modalWrapper.remove();
+  });
+
+  bootstrapModal.show();
+};
+
+const renderAssignLocationPage = async () => {
+  elements.pageTitle.textContent = 'Assign Location';
+  elements.pageSubtitle.textContent = 'Assign field staff to locations and manage updates.';
+
+  const flash = state.assignLocationFlash;
+  state.assignLocationFlash = null;
+
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading assigned locations...</div>';
+
+  try {
+    const [usersResponse, locationsResponse] = await Promise.all([fetch(USER_API_URL), fetch(LOCATION_API_URL)]);
+
+    if (!usersResponse.ok || !locationsResponse.ok) {
+      throw new Error('request_failed');
+    }
+
+    const users = normalizeUsers(await usersResponse.json());
+    const locations = normalizeLocations(await locationsResponse.json());
+
+    const tableRows = locations.length
+      ? locations
+          .map(
+            (location) => `
+              <tr>
+                <td>${displayValue(location.locationName)}</td>
+                <td>${displayValue(findUserName(users, location.staffId, location.staffName))}</td>
+                <td>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-primary btn-sm" data-action="edit" data-location-id="${location.locationId}">Update</button>
+                    <button class="btn btn-outline-danger btn-sm" data-action="delete" data-location-id="${location.locationId}">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `
+          )
+          .join('')
+      : '<tr><td colspan="3" class="text-center text-muted py-4">No assigned locations found.</td></tr>';
+
+    elements.contentHost.innerHTML = `
+      <section class="fixed-page-shell mx-auto w-100 assign-location-shell d-flex flex-column gap-3">
+        ${
+          flash
+            ? `<div class="alert alert-${flash.type} mb-0" role="alert">${flash.text}</div>`
+            : ''
+        }
+        <div class="d-flex justify-content-end">
+          <button id="createAssignBtn" class="btn btn-theme">Create Assign</button>
+        </div>
+        <div class="table-responsive assign-location-table-wrap">
+          <table class="table table-hover align-middle mb-0 assign-location-table">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Location Name</th>
+                <th scope="col">Assigned Staff</th>
+                <th scope="col" class="text-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+
+    const rerender = async () => {
+      await renderAssignLocationPage();
+    };
+
+    const createBtn = document.getElementById('createAssignBtn');
+    createBtn.addEventListener('click', () => {
+      showAssignLocationModal({ mode: 'create', users, onSuccess: rerender });
+    });
+
+    elements.contentHost.querySelectorAll('[data-action="edit"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const location = locations.find((item) => String(item.locationId) === button.dataset.locationId);
+        if (!location) return;
+        showAssignLocationModal({ mode: 'edit', users, location, onSuccess: rerender });
+      });
+    });
+
+    elements.contentHost.querySelectorAll('[data-action="delete"]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const location = locations.find((item) => String(item.locationId) === button.dataset.locationId);
+        if (!location) return;
+
+        const confirmed = window.confirm(`Delete location assignment for "${location.locationName}"?`);
+        if (!confirmed) return;
+
+        try {
+          const response = await fetch(`${LOCATION_API_URL}/${encodeURIComponent(location.locationId)}`, {
+            method: 'DELETE'
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          state.assignLocationFlash = {
+            type: 'success',
+            text: 'Location assignment deleted successfully.'
+          };
+          await rerender();
+        } catch {
+          state.assignLocationFlash = {
+            type: 'danger',
+            text: 'Failed to delete location assignment.'
+          };
+          await rerender();
+        }
+      });
+    });
+  } catch {
+    elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to load assigned locations. Please try again later.</div>';
+  }
+};
+
 const renderRoute = async () => {
   if (!state.isAuthenticated) return;
 
-  const { mainRoute, routeParam } = parseRoute();
-  setActiveNav(mainRoute === 'stock-balance' ? 'stock-balance' : mainRoute);
+  const { mainRoute } = parseRoute();
+  setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' ? mainRoute : 'dashboard');
 
   if (mainRoute === 'stock-balance') {
     await renderStockBalanceList();
+    return;
+  }
+
+  if (mainRoute === 'assign-location') {
+    await renderAssignLocationPage();
     return;
   }
 
