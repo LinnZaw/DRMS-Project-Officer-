@@ -983,6 +983,114 @@ const groupBeneficiariesByLocation = (beneficiaries) =>
     return acc;
   }, {});
 
+const showManageBeneficiaryUpdateModal = ({ beneficiary, onSuccess }) => {
+  const modalWrapper = document.createElement('div');
+  modalWrapper.innerHTML = `
+    <div class="modal fade" id="manageBeneficiaryUpdateModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Update Beneficiary</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form id="manageBeneficiaryUpdateForm" novalidate>
+            <div class="modal-body">
+              <div id="manageBeneficiaryUpdateAlert" class="alert d-none" role="alert"></div>
+              <div class="mb-3">
+                <label class="form-label" for="beneficiaryNameInput">Beneficiary Name</label>
+                <input id="beneficiaryNameInput" name="beneficiaryName" type="text" class="form-control" required value="${displayValue(beneficiary.beneficiaryName) === 'N/A' ? '' : beneficiary.beneficiaryName}" />
+                <div class="invalid-feedback">Beneficiary Name is required.</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="beneficiaryFatherNameInput">Father Name</label>
+                <input id="beneficiaryFatherNameInput" name="fatherName" type="text" class="form-control" required value="${displayValue(beneficiary.fatherName) === 'N/A' ? '' : beneficiary.fatherName}" />
+                <div class="invalid-feedback">Father Name is required.</div>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="beneficiaryContactInput">Contact</label>
+                <input id="beneficiaryContactInput" name="contact" type="text" class="form-control" required value="${displayValue(beneficiary.contact) === 'N/A' ? '' : beneficiary.contact}" />
+                <div class="invalid-feedback">Contact is required.</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-theme">Update</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalWrapper);
+
+  const modalElement = modalWrapper.querySelector('#manageBeneficiaryUpdateModal');
+  const form = modalWrapper.querySelector('#manageBeneficiaryUpdateForm');
+  const alertBox = modalWrapper.querySelector('#manageBeneficiaryUpdateAlert');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const bootstrapModal = new bootstrap.Modal(modalElement);
+
+  const showAlert = (type, message) => {
+    alertBox.className = `alert alert-${type}`;
+    alertBox.textContent = message;
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!form.checkValidity()) {
+      form.classList.add('was-validated');
+      return;
+    }
+
+    submitBtn.disabled = true;
+
+    const payload = {
+      beneficName: form.beneficiaryName.value.trim(),
+      fatherName: form.fatherName.value.trim(),
+      contact: form.contact.value.trim()
+    };
+
+    try {
+      const response = await fetch(`${BENEFICIARY_API_URL}/${encodeURIComponent(beneficiary.id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        let message = 'Failed to update beneficiary.';
+        try {
+          const errorPayload = await response.json();
+          message = errorPayload?.message || message;
+        } catch {
+          // noop
+        }
+        throw new Error(message);
+      }
+
+      state.manageBeneficiaryFlash = {
+        type: 'success',
+        text: 'Beneficiary updated successfully.'
+      };
+      bootstrapModal.hide();
+      await onSuccess();
+    } catch (error) {
+      showAlert('danger', error.message || 'Failed to update beneficiary.');
+      submitBtn.disabled = false;
+    }
+  });
+
+  modalElement.addEventListener('hidden.bs.modal', () => {
+    bootstrapModal.dispose();
+    modalWrapper.remove();
+  });
+
+  bootstrapModal.show();
+};
+
 const renderManageBeneficiaryPage = async () => {
   elements.pageTitle.textContent = 'Manage Beneficiary';
   elements.pageSubtitle.textContent = 'Group beneficiaries by location and manage beneficiary records.';
@@ -1137,12 +1245,16 @@ const renderManageBeneficiaryPage = async () => {
 
     elements.contentHost.querySelectorAll('[data-action="update-beneficiary"]').forEach((button) => {
       button.addEventListener('click', () => {
-        state.manageBeneficiaryFlash = {
-          type: 'info',
-          text: 'Update action is available as a button and can be integrated with an update API endpoint.'
-        };
-        state.selectedBeneficiaryLocation = button.dataset.locationName;
-        rerender();
+        const beneficiary = selectedBeneficiaries.find((item) => String(item.id) === button.dataset.beneficiaryId);
+        if (!beneficiary) return;
+
+        showManageBeneficiaryUpdateModal({
+          beneficiary,
+          onSuccess: async () => {
+            state.selectedBeneficiaryLocation = button.dataset.locationName;
+            await rerender();
+          }
+        });
       });
     });
 
