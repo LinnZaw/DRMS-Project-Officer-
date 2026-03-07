@@ -177,7 +177,7 @@ const formatQuantityWithUnit = (quantity, unit) => {
  * Normalize API payload to an array of stock records.
  */
 const normalizeStockInfo = (payload) => {
-  const source = payload?.data?.stockInfo ?? payload?.data ?? payload;
+  const source = payload?.data?.stockInfos ?? payload?.data ?? payload;
 
   if (Array.isArray(source)) {
     return source;
@@ -327,6 +327,9 @@ const renderStockBalanceList = async () => {
     }
 
     const payload = await response.json();
+    // for test
+    console.log("API RESPONSE:", payload);
+
     const stocks = normalizeStockInfo(payload).sort((left, right) => {
       const leftDate = new Date(getReportedDateValue(left) || 0).getTime();
       const rightDate = new Date(getReportedDateValue(right) || 0).getTime();
