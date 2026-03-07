@@ -457,7 +457,7 @@ const showAssignLocationModal = ({ mode, users = [], location, onSuccess }) => {
       const endpoint = isEdit
         ? `${LOCATION_API_URL}/${encodeURIComponent(location.locationId)}`
         : `${LOCATION_API_URL}/${LOCATION_CREATOR_ID}`;
-      const method = isEdit ? 'PUT' : 'POST';
+      const method = isEdit ? 'PATCH' : 'POST';
 
       const response = await fetch(endpoint, {
         method,
