@@ -4,7 +4,9 @@ const state = {
   roleLookupLoaded: false,
   roleLookup: [],
   fieldStaffRoleId: null,
-  assignDistributionFlash: null
+  assignDistributionFlash: null,
+  manageBeneficiaryFlash: null,
+  selectedBeneficiaryLocation: null
 };
 
 const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
@@ -26,6 +28,7 @@ const LOCATION_API_URL = 'http://localhost:8080/api/locations';
 const USER_API_URL = 'http://localhost:8080/api/users';
 const ROLE_API_URL = 'http://localhost:8080/api/roles';
 const ASSIGN_DISTRIBUTION_API_URL = 'http://localhost:8080/api/assign-distributions';
+const BENEFICIARY_API_URL = 'http://localhost:8080/api/beneficiaries';
 const LOCATION_CREATOR_ID = 2;
 const PROJECT_OFFICER_ID = 2;
 
@@ -251,7 +254,7 @@ const renderStockBalanceList = async () => {
     });
 
     if (!stocks.length) {
-      renderStockBalanceContent('info', 'No stock data available.');
+      renderStockBalanceContent('info', 'No stock balance found.', '<div class="alert alert-light border mb-0" role="alert">No stock balance found.</div>');
       return;
     }
 
@@ -511,8 +514,9 @@ const renderAssignLocationPage = async () => {
     const tableRows = locations.length
       ? locations
           .map(
-            (location) => `
+            (location, index) => `
               <tr>
+                <td>${index + 1}</td>
                 <td>${displayValue(location.locationName)}</td>
                 <td>${displayValue(displayAssignedStaff(location))}</td>
                 <td>
@@ -525,7 +529,7 @@ const renderAssignLocationPage = async () => {
             `
           )
           .join('')
-      : '<tr><td colspan="3" class="text-center text-muted py-4">No assigned locations found.</td></tr>';
+      : '<tr><td colspan="4" class="text-center text-muted py-4">No assigned location found.</td></tr>';
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 assign-location-shell d-flex flex-column gap-3">
@@ -541,6 +545,7 @@ const renderAssignLocationPage = async () => {
           <table class="table table-hover align-middle mb-0 assign-location-table">
             <thead class="table-light">
               <tr>
+                <th scope="col">No</th>
                 <th scope="col">Location Name</th>
                 <th scope="col">Assigned Staff</th>
                 <th scope="col" class="text-nowrap">Actions</th>
@@ -832,6 +837,7 @@ const renderAssignDistributionPage = async () => {
                 <td>${index + 1}</td>
                 <td>${displayValue(row.locationName)}</td>
                 <td>${displayValue(row.eventType)}</td>
+                <td>${formatStockDateTime(row.distributionDate)}</td>
                 <td><span class="badge ${isCompleted ? 'text-bg-success' : 'text-bg-warning'}">${derivedStatus}</span></td>
                 <td>
                   <div class="d-flex flex-wrap gap-2">
@@ -847,7 +853,7 @@ const renderAssignDistributionPage = async () => {
             `;
           })
           .join('')
-      : '<tr><td colspan="5" class="text-center text-muted py-4">No assigned distributions found.</td></tr>';
+      : '<tr><td colspan="6" class="text-center text-muted py-4">No assigned distributions found.</td></tr>';
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 assign-distribution-shell d-flex flex-column gap-3">
@@ -866,6 +872,7 @@ const renderAssignDistributionPage = async () => {
                 <th scope="col">No</th>
                 <th scope="col">Location Name</th>
                 <th scope="col">Event Type</th>
+                <th scope="col">Distribution Date</th>
                 <th scope="col">Status</th>
                 <th scope="col" class="text-nowrap">Action</th>
               </tr>
@@ -941,11 +948,355 @@ const renderAssignDistributionPage = async () => {
   }
 };
 
+
+const normalizeBeneficiaries = (payload) => {
+  const source = payload?.data?.beneficiaries ?? payload?.data ?? payload;
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((item, index) => ({
+    id: item.id ?? item.beneficiaryId ?? item.beneficiaryID ?? item.userId ?? index,
+    beneficiaryName: item.beneficiaryName ?? item.beneficName ?? item.name ?? item.fullName ?? item.beneficiary?.name ?? 'Unknown Beneficiary',
+    fatherName: item.fatherName ?? item.parentName ?? item.father ?? item.guardianName,
+    contact: item.contact ?? item.phone ?? item.phoneNo ?? item.mobile,
+    locationId: item.locationId ?? item.location?.locationId ?? item.location?.id,
+    locationName: item.locationName ?? item.location?.locationName ?? item.location?.name
+  }));
+};
+
+const groupBeneficiariesByLocation = (beneficiaries) =>
+  beneficiaries.reduce((acc, beneficiary) => {
+    const locationName = displayValue(beneficiary.locationName);
+    if (!acc[locationName]) {
+      acc[locationName] = [];
+    }
+    acc[locationName].push(beneficiary);
+    return acc;
+  }, {});
+
+const showManageBeneficiaryUpdateModal = ({ beneficiary, onSuccess }) => {
+  const modalWrapper = document.createElement('div');
+  modalWrapper.innerHTML = `
+    <div class="modal fade" id="manageBeneficiaryUpdateModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Update Beneficiary</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form id="manageBeneficiaryUpdateForm" novalidate>
+            <div class="modal-body">
+              <div id="manageBeneficiaryUpdateAlert" class="alert d-none" role="alert"></div>
+              <div class="mb-3">
+                <label class="form-label" for="beneficiaryNameInput">Beneficiary Name</label>
+                <input id="beneficiaryNameInput" name="beneficiaryName" type="text" class="form-control" required value="${displayValue(beneficiary.beneficiaryName) === 'N/A' ? '' : beneficiary.beneficiaryName}" />
+                <div class="invalid-feedback">Beneficiary Name is required.</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="beneficiaryFatherNameInput">Father Name</label>
+                <input id="beneficiaryFatherNameInput" name="fatherName" type="text" class="form-control" required value="${displayValue(beneficiary.fatherName) === 'N/A' ? '' : beneficiary.fatherName}" />
+                <div class="invalid-feedback">Father Name is required.</div>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="beneficiaryContactInput">Contact</label>
+                <input id="beneficiaryContactInput" name="contact" type="text" class="form-control" required value="${displayValue(beneficiary.contact) === 'N/A' ? '' : beneficiary.contact}" />
+                <div class="invalid-feedback">Contact is required.</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-theme">Update</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalWrapper);
+
+  const modalElement = modalWrapper.querySelector('#manageBeneficiaryUpdateModal');
+  const form = modalWrapper.querySelector('#manageBeneficiaryUpdateForm');
+  const alertBox = modalWrapper.querySelector('#manageBeneficiaryUpdateAlert');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const bootstrapModal = new bootstrap.Modal(modalElement);
+
+  const showAlert = (type, message) => {
+    alertBox.className = `alert alert-${type}`;
+    alertBox.textContent = message;
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!form.checkValidity()) {
+      form.classList.add('was-validated');
+      return;
+    }
+
+    submitBtn.disabled = true;
+
+    const payload = {
+      beneficName: form.beneficiaryName.value.trim(),
+      fatherName: form.fatherName.value.trim(),
+      contact: form.contact.value.trim()
+    };
+
+    try {
+      const response = await fetch(`${BENEFICIARY_API_URL}/${encodeURIComponent(beneficiary.id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        let message = 'Failed to update beneficiary.';
+        try {
+          const errorPayload = await response.json();
+          message = errorPayload?.message || message;
+        } catch {
+          // noop
+        }
+        throw new Error(message);
+      }
+
+      state.manageBeneficiaryFlash = {
+        type: 'success',
+        text: 'Beneficiary updated successfully.'
+      };
+      bootstrapModal.hide();
+      await onSuccess();
+    } catch (error) {
+      showAlert('danger', error.message || 'Failed to update beneficiary.');
+      submitBtn.disabled = false;
+    }
+  });
+
+  modalElement.addEventListener('hidden.bs.modal', () => {
+    bootstrapModal.dispose();
+    modalWrapper.remove();
+  });
+
+  bootstrapModal.show();
+};
+
+const renderManageBeneficiaryPage = async () => {
+  elements.pageTitle.textContent = 'Manage Beneficiary';
+  elements.pageSubtitle.textContent = 'Group beneficiaries by location and manage beneficiary records.';
+
+  const flash = state.manageBeneficiaryFlash;
+  state.manageBeneficiaryFlash = null;
+
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading beneficiaries...</div>';
+
+  try {
+    const beneficiaryResponse = await fetch(BENEFICIARY_API_URL);
+
+    if (!beneficiaryResponse.ok) {
+      throw new Error(`HTTP ${beneficiaryResponse.status}`);
+    }
+
+    const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
+
+    let locations = [];
+    try {
+      const locationResponse = await fetch(LOCATION_API_URL);
+      if (locationResponse.ok) {
+        locations = normalizeLocations(await locationResponse.json());
+      }
+    } catch {
+      locations = [];
+    }
+
+    const locationNameById = new Map(
+      locations
+        .filter((location) => location.locationId !== undefined && location.locationId !== null)
+        .map((location) => [String(location.locationId), location.locationName])
+    );
+
+    const beneficiariesWithLocationName = beneficiaries.map((beneficiary) => ({
+      ...beneficiary,
+      locationName: beneficiary.locationName ?? locationNameById.get(String(beneficiary.locationId)) ?? 'Unknown Location'
+    }));
+
+    const grouped = groupBeneficiariesByLocation(beneficiariesWithLocationName);
+    const locationNames = Object.keys(grouped);
+    const hasBeneficiaries = beneficiariesWithLocationName.length > 0;
+
+    const selectedLocation =
+      state.selectedBeneficiaryLocation && grouped[state.selectedBeneficiaryLocation]
+        ? state.selectedBeneficiaryLocation
+        : locationNames[0] || null;
+
+    state.selectedBeneficiaryLocation = selectedLocation;
+
+    const locationCards = hasBeneficiaries
+      ? locationNames
+          .map((locationName) => {
+            const isActive = locationName === selectedLocation;
+            return `
+              <article
+                class="beneficiary-location-card ${isActive ? 'active' : ''}"
+                role="button"
+                tabindex="0"
+                data-location-name="${locationName.replaceAll('"', '&quot;')}"
+                aria-pressed="${isActive ? 'true' : 'false'}"
+                aria-label="View beneficiaries in ${locationName}"
+              >
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                  <div>
+                    <p class="small text-muted mb-1">Location Name</p>
+                    <h6 class="mb-0 theme-text">${locationName}</h6>
+                  </div>
+                  <div class="text-end">
+                    <p class="small text-muted mb-1">Total Beneficiaries</p>
+                    <p class="mb-0 fw-semibold">${grouped[locationName].length}</p>
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join('')
+      : '';
+
+    const selectedBeneficiaries = selectedLocation ? grouped[selectedLocation] ?? [] : [];
+
+    const detailsSection = hasBeneficiaries
+      ? `
+        <div class="beneficiary-detail-wrap">
+          <div class="d-flex justify-content-between align-items-center px-3 px-md-4 py-3 border-bottom">
+            <h6 class="mb-0">Beneficiaries in ${selectedLocation}</h6>
+            <span class="badge text-bg-primary">${selectedBeneficiaries.length}</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 beneficiary-detail-table">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">No</th>
+                  <th scope="col">Beneficiary Name</th>
+                  <th scope="col">Father Name</th>
+                  <th scope="col">Contact</th>
+                  <th scope="col" class="text-nowrap">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${selectedBeneficiaries
+                  .map(
+                    (item, index) => `
+                      <tr>
+                        <td>${index + 1}</td>
+                        <td>${displayValue(item.beneficiaryName)}</td>
+                        <td>${displayValue(item.fatherName)}</td>
+                        <td>${displayValue(item.contact)}</td>
+                        <td>
+                          <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary btn-sm" data-action="update-beneficiary" data-beneficiary-id="${item.id}" data-location-name="${selectedLocation.replaceAll('"', '&quot;')}">Update</button>
+                            <button class="btn btn-outline-danger btn-sm" data-action="delete-beneficiary" data-beneficiary-id="${item.id}" data-location-name="${selectedLocation.replaceAll('"', '&quot;')}">Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `
+                  )
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `
+      : '<div class="alert alert-info mb-0">No beneficiary found.</div>';
+
+    elements.contentHost.innerHTML = `
+      <section class="fixed-page-shell mx-auto w-100 manage-beneficiary-shell d-flex flex-column gap-3">
+        ${flash ? `<div class="alert alert-${flash.type} mb-0" role="alert">${flash.text}</div>` : ''}
+        ${locationCards ? `<div class="beneficiary-location-grid">${locationCards}</div>` : ''}
+        ${detailsSection}
+      </section>
+    `;
+
+    const rerender = async () => {
+      await renderManageBeneficiaryPage();
+    };
+
+    const handleLocationSelect = (locationName) => {
+      if (!grouped[locationName]) return;
+      state.selectedBeneficiaryLocation = locationName;
+      rerender();
+    };
+
+    elements.contentHost.querySelectorAll('.beneficiary-location-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        handleLocationSelect(card.dataset.locationName);
+      });
+
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleLocationSelect(card.dataset.locationName);
+        }
+      });
+    });
+
+    elements.contentHost.querySelectorAll('[data-action="update-beneficiary"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const beneficiary = selectedBeneficiaries.find((item) => String(item.id) === button.dataset.beneficiaryId);
+        if (!beneficiary) return;
+
+        showManageBeneficiaryUpdateModal({
+          beneficiary,
+          onSuccess: async () => {
+            state.selectedBeneficiaryLocation = button.dataset.locationName;
+            await rerender();
+          }
+        });
+      });
+    });
+
+    elements.contentHost.querySelectorAll('[data-action="delete-beneficiary"]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const beneficiaryId = button.dataset.beneficiaryId;
+        const confirmed = window.confirm('Are you sure you want to delete this beneficiary?');
+        if (!confirmed) return;
+
+        try {
+          const deleteResponse = await fetch(`${BENEFICIARY_API_URL}/${encodeURIComponent(beneficiaryId)}`, {
+            method: 'DELETE'
+          });
+
+          if (!deleteResponse.ok) {
+            throw new Error(`HTTP ${deleteResponse.status}`);
+          }
+
+          state.manageBeneficiaryFlash = {
+            type: 'success',
+            text: 'Beneficiary deleted successfully.'
+          };
+          state.selectedBeneficiaryLocation = button.dataset.locationName;
+          await rerender();
+        } catch {
+          state.manageBeneficiaryFlash = {
+            type: 'danger',
+            text: 'Failed to delete beneficiary. Please try again.'
+          };
+          state.selectedBeneficiaryLocation = button.dataset.locationName;
+          await rerender();
+        }
+      });
+    });
+  } catch {
+    elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to load beneficiaries. Please try again later.</div>';
+  }
+};
+
+
 const renderRoute = async () => {
   if (!state.isAuthenticated) return;
 
   const { mainRoute } = parseRoute();
-  setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' || mainRoute === 'assign-distribution' ? mainRoute : 'dashboard');
+  setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' || mainRoute === 'assign-distribution' || mainRoute === 'manage-beneficiary' ? mainRoute : 'dashboard');
 
   if (mainRoute === 'stock-balance') {
     await renderStockBalanceList();
@@ -959,6 +1310,11 @@ const renderRoute = async () => {
 
   if (mainRoute === 'assign-distribution') {
     await renderAssignDistributionPage();
+    return;
+  }
+
+  if (mainRoute === 'manage-beneficiary') {
+    await renderManageBeneficiaryPage();
     return;
   }
 
