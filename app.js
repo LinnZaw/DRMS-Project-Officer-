@@ -254,7 +254,7 @@ const renderStockBalanceList = async () => {
     });
 
     if (!stocks.length) {
-      renderStockBalanceContent('info', 'No stock data available.');
+      renderStockBalanceContent('info', 'No stock balance found.', '<div class="alert alert-light border mb-0" role="alert">No stock balance found.</div>');
       return;
     }
 
@@ -529,7 +529,7 @@ const renderAssignLocationPage = async () => {
             `
           )
           .join('')
-      : '<tr><td colspan="4" class="text-center text-muted py-4">No assigned locations found.</td></tr>';
+      : '<tr><td colspan="4" class="text-center text-muted py-4">No assigned location found.</td></tr>';
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 assign-location-shell d-flex flex-column gap-3">
@@ -1101,21 +1101,24 @@ const renderManageBeneficiaryPage = async () => {
   elements.contentHost.innerHTML = '<div class="text-muted">Loading beneficiaries...</div>';
 
   try {
-    const [beneficiaryResponse, locationResponse] = await Promise.all([
-      fetch(BENEFICIARY_API_URL),
-      fetch(LOCATION_API_URL)
-    ]);
+    const beneficiaryResponse = await fetch(BENEFICIARY_API_URL);
 
     if (!beneficiaryResponse.ok) {
       throw new Error(`HTTP ${beneficiaryResponse.status}`);
     }
 
-    if (!locationResponse.ok) {
-      throw new Error(`HTTP ${locationResponse.status}`);
+    const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
+
+    let locations = [];
+    try {
+      const locationResponse = await fetch(LOCATION_API_URL);
+      if (locationResponse.ok) {
+        locations = normalizeLocations(await locationResponse.json());
+      }
+    } catch {
+      locations = [];
     }
 
-    const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
-    const locations = normalizeLocations(await locationResponse.json());
     const locationNameById = new Map(
       locations
         .filter((location) => location.locationId !== undefined && location.locationId !== null)
@@ -1162,7 +1165,7 @@ const renderManageBeneficiaryPage = async () => {
             `;
           })
           .join('')
-      : '<div class="alert alert-info mb-0">No beneficiaries found.</div>';
+      : '<div class="alert alert-info mb-0">No beneficiary found.</div>';
 
     const selectedBeneficiaries = selectedLocation ? grouped[selectedLocation] || [] : [];
 
@@ -1210,7 +1213,7 @@ const renderManageBeneficiaryPage = async () => {
           </div>
         </div>
       `
-      : '<div class="alert alert-info mb-0">Select a location to view beneficiaries.</div>';
+      : '<div class="alert alert-info mb-0">No beneficiary found.</div>';
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 manage-beneficiary-shell d-flex flex-column gap-3">
