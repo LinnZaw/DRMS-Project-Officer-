@@ -32,6 +32,8 @@ const ROLE_API_URL = 'http://localhost:8080/api/roles';
 const ASSIGN_DISTRIBUTION_API_URL = 'http://localhost:8080/api/assign-distributions';
 const BENEFICIARY_API_URL = 'http://localhost:8080/api/beneficiaries';
 const DISTRIBUTION_RECORDS_API_URL = 'http://localhost:8080/api/distribution';
+const STATUS_DISTRIBUTION_RECORDS_API_URL = 'http://localhost:8080/api/distribution/status';
+
 const LOCATION_CREATOR_ID = 2;
 const PROJECT_OFFICER_ID = 2;
 
@@ -166,11 +168,11 @@ const renderStockBalanceContent = (messageType, messageText, bodyHtml = '') => {
 
   const alertClass = alertClassMap[messageType] || 'alert-info';
 
-  //for test 
-  //       <div class="stock-list-scroll">${bodyHtml}</div>
+  
   elements.contentHost.innerHTML = `
     <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
       <div class="alert ${alertClass} mb-0" role="alert">${messageText}</div>
+       <div class="stock-list-scroll">${bodyHtml}</div>
     </section>
   `;
 };
@@ -270,6 +272,7 @@ const renderStockBalanceList = async () => {
   renderStockBalanceContent('info', 'Loading stock data...');
 
 const response = await fetch(STOCK_API_URL);
+try{
 
     const payload = await parseJsonIfPresent(response);
     const stocks = getSortedStocks(payload);
@@ -1545,7 +1548,7 @@ const renderConfirmDistributionRecordsPage = async () => {
 
     const patchStatus = async (recordId, status) => {
       try {
-        const patchResponse = await fetch(`${DISTRIBUTION_RECORDS_API_URL}/${encodeURIComponent(recordId)}`, {
+        const patchResponse = await fetch(`${STATUS_DISTRIBUTION_RECORDS_API_URL}/${encodeURIComponent(recordId)}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json'
