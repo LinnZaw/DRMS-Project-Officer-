@@ -252,6 +252,15 @@ const renderStockBalanceDetailView = (stock, index, stocks) => {
   }
 };
 
+const getSortedStocks = (payload) =>
+  normalizeStockInfo(payload)
+    .filter((stock) => stock && typeof stock === 'object')
+    .sort((left, right) => {
+      const leftDate = new Date(getReportedDateValue(left) || 0).getTime();
+      const rightDate = new Date(getReportedDateValue(right) || 0).getTime();
+      return rightDate - leftDate;
+    });
+
 const renderStockBalanceList = async () => {
   elements.pageTitle.textContent = 'Stock Balance';
   elements.pageSubtitle.textContent = 'Stock balance records sorted by latest reported date.';
@@ -268,15 +277,14 @@ const response = await fetch(STOCK_API_URL);
     //   }
 
     const payload = await parseJsonIfPresent(response);
-
-    const stocks = normalizeStockInfo(payload).sort((left, right) => {
-      const leftDate = new Date(getReportedDateValue(left) || 0).getTime();
-      const rightDate = new Date(getReportedDateValue(right) || 0).getTime();
-      return rightDate - leftDate;
-    });
+    const stocks = getSortedStocks(payload);
 
     if (!stocks.length) {
-      renderStockBalanceContent('info', 'No stock balance found.', '<div class="alert alert-light border mb-0" role="alert">No stock balance found.</div>');
+      renderStockBalanceContent(
+        'info',
+        'No stock balance found.',
+        '<section class="d-grid gap-3"><article class="stock-summary-card" aria-live="polite">No stock balance found.</article></section>'
+      );
       return;
     }
 
