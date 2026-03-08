@@ -163,10 +163,11 @@ const renderStockBalanceContent = (messageType, messageText, bodyHtml = '') => {
 
   const alertClass = alertClassMap[messageType] || 'alert-info';
 
+  //for test 
+  //       <div class="stock-list-scroll">${bodyHtml}</div>
   elements.contentHost.innerHTML = `
     <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
       <div class="alert ${alertClass} mb-0" role="alert">${messageText}</div>
-      <div class="stock-list-scroll">${bodyHtml}</div>
     </section>
   `;
 };
@@ -256,11 +257,14 @@ const renderStockBalanceList = async () => {
   elements.pageSubtitle.textContent = 'Stock balance records sorted by latest reported date.';
   renderStockBalanceContent('info', 'Loading stock data...');
 
+
   try {
-    const response = await fetch(STOCK_API_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    let payload = {};
+      try {
+        payload = await response.json();
+      } catch {
+        payload = {};
+      }
 
     const payload = await parseJsonIfPresent(response);
 
@@ -351,7 +355,7 @@ const getFieldStaffRoleId = async () => {
   }
 
   const roles = await ensureRoleLookup();
-  const fieldStaffRole = roles.find((role) => role.roleName === 'FIELD_STAFF');
+  const fieldStaffRole = roles.find((role) => role.roleName === 'FIELDSTAFF');
   if (!fieldStaffRole?.roleId) {
     throw new Error('field_staff_role_not_found');
   }
@@ -522,11 +526,20 @@ const renderAssignLocationPage = async () => {
   try {
     const locationsResponse = await fetch(LOCATION_API_URL);
 
-    if (!locationsResponse.ok) {
-      throw new Error('request_failed');
-    }
+    // if (!locationsResponse.ok) {
+    //   throw new Error('request_failed');
+    // }
 
-    const locations = normalizeLocations(await locationsResponse.json());
+      let data = {};
+      try {
+        data = await locationsResponse.json();
+      } catch {
+        data = {};
+      }
+
+      const locations = normalizeLocations(data);
+
+    // const locations = normalizeLocations(await locationsResponse.json());
 
     const tableRows = locations.length
       ? locations
@@ -711,7 +724,7 @@ const showAssignDistributionModal = ({ mode, distribution, onSuccess }) => {
                 <label class="form-label" for="distributionEventTypeInput">Event Type</label>
                 <select id="distributionEventTypeInput" name="eventType" class="form-select" required>
                   <option value="">Select event type</option>
-                  ${['Flood', 'Earthquake', 'Cyclone', 'Landslide', 'Fire', 'Storm']
+                  ${['Conflict_Area','EarthQuake','Fire','Flood','Remote_Area','Storm']
                     .map((eventType) => `<option value="${eventType}" ${distribution?.eventType === eventType ? 'selected' : ''}>${eventType}</option>`)
                     .join('')}
                 </select>
@@ -792,7 +805,7 @@ const showAssignDistributionModal = ({ mode, distribution, onSuccess }) => {
 
     try {
       const endpoint = isEdit
-        ? `${ASSIGN_DISTRIBUTION_API_URL}/${encodeURIComponent(distribution?.userId ?? PROJECT_OFFICER_ID)}`
+        ? `${ASSIGN_DISTRIBUTION_API_URL}/${encodeURIComponent(distribution?.id)}`
         : `${ASSIGN_DISTRIBUTION_API_URL}?userId=${encodeURIComponent(PROJECT_OFFICER_ID)}`;
       const method = isEdit ? 'PATCH' : 'POST';
 
@@ -929,16 +942,17 @@ const renderAssignDistributionPage = async () => {
       });
     });
 
-    elements.contentHost.querySelectorAll('[data-action="delete-distribution"]').forEach((button) => {
+      elements.contentHost.querySelectorAll('[data-action="delete-distribution"]').forEach((button) => {
       button.addEventListener('click', async () => {
-        const row = rows[Number(button.dataset.rowIndex)];
+        const rowIndex = Number(button.dataset.rowIndex);
+        const row = rows[rowIndex];
         if (!row) return;
 
         const confirmed = window.confirm(`Delete assigned distribution for ${row.locationName}?`);
         if (!confirmed) return;
 
         try {
-          const response = await fetch(`${ASSIGN_DISTRIBUTION_API_URL}/${encodeURIComponent(row.userId ?? PROJECT_OFFICER_ID)}`, {
+          const response = await fetch(`${ASSIGN_DISTRIBUTION_API_URL}/${encodeURIComponent(row.id)}`, {
             method: 'DELETE'
           });
 
@@ -946,16 +960,22 @@ const renderAssignDistributionPage = async () => {
             throw new Error(`HTTP ${response.status}`);
           }
 
+          // Remove deleted row from UI state
+          rows.splice(rowIndex, 1);
+
           state.assignDistributionFlash = {
             type: 'success',
             text: 'Assigned distribution deleted successfully.'
           };
+
           await rerender();
+
         } catch {
           state.assignDistributionFlash = {
             type: 'danger',
             text: 'Failed to delete assigned distribution.'
           };
+
           await rerender();
         }
       });
