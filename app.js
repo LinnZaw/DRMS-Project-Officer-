@@ -257,14 +257,15 @@ const renderStockBalanceList = async () => {
   elements.pageSubtitle.textContent = 'Stock balance records sorted by latest reported date.';
   renderStockBalanceContent('info', 'Loading stock data...');
 
+const response = await fetch(STOCK_API_URL);
 
   try {
-    let payload = {};
-      try {
-        payload = await response.json();
-      } catch {
-        payload = {};
-      }
+    // let payload = {};
+    //   try {
+    //     payload = await response.json();
+    //   } catch {
+    //     payload = {};
+    //   }
 
     const payload = await parseJsonIfPresent(response);
 
