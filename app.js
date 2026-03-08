@@ -1384,7 +1384,7 @@ const renderManageBeneficiaryPage = async () => {
 
 
 const normalizeDistributionRecords = (payload) => {
-  const source = payload?.data?.distributions ?? payload?.data?.distributionRecords ?? payload?.data ?? payload;
+  const source = payload?.data?.distributionRecords ?? [];
 
   if (!Array.isArray(source)) {
     return [];
@@ -1396,16 +1396,20 @@ const normalizeDistributionRecords = (payload) => {
     locationName: item.locationName ?? item.location?.locationName ?? item.location?.name ?? 'Unknown Location',
     fieldStaffName: item.user?.email ?? item.user?.name ?? item.user?.userName ?? item.staffName ?? item.userName ?? 'N/A',
     beneficiaryName: item.beneficiary?.beneficName ?? item.beneficiary?.beneficiaryName ?? item.beneficiaryName ?? item.beneficName,
-    nrc: item.beneficiary?.nrc ?? item.beneficiary?.nrcNo ?? item.nrc,
+    houseHoldNrc: item.houseHoldNrc ?? item.beneficiary?.houseHoldNrc ?? item.beneficiary?.nrc ?? item.beneficiary?.nrcNo,
     familyMembers: item.familyMembers ?? item.familyMember ?? item.beneficiary?.familyMembers,
     underFive: item.underFive ?? item.underfive ?? item.beneficiary?.underFive,
     disabled: item.disabled ?? item.disability ?? item.beneficiary?.disabled,
-    distributedItems: item.distributedItems ?? item.items ?? [],
+    distributedItems: item.distributedItems ?? [],
     status: item.status ?? 'Pending'
   }));
 };
 
 const formatDistributedItems = (items) => {
+  if (typeof items === 'string') {
+    return items.trim() || 'N/A';
+  }
+
   if (!Array.isArray(items) || !items.length) {
     return 'N/A';
   }
@@ -1537,7 +1541,7 @@ const renderConfirmDistributionRecordsPage = async () => {
                       <tr>
                         <td>${index + 1}</td>
                         <td>${displayValue(record.beneficiaryName)}</td>
-                        <td>${displayValue(record.nrc)}</td>
+                        <td>${displayValue(record.houseHoldNrc)}</td>
                         <td>${displayValue(record.familyMembers)}</td>
                         <td>${displayValue(record.underFive)}</td>
                         <td>${displayValue(record.disabled)}</td>
