@@ -1116,34 +1116,18 @@ const renderManageBeneficiaryPage = async () => {
   try {
     const beneficiaryResponse = await fetch(BENEFICIARY_API_URL);
 
-    // if (!beneficiaryResponse.ok) {
-    //   throw new Error(`HTTP ${beneficiaryResponse.status}`);
-    // }
+    if (!beneficiaryResponse.ok) {
+      throw new Error(`HTTP ${beneficiaryResponse.status}`);
+    }
 
-      let data = {};
-      try {
-        data = await beneficiaryResponse.json();
-      } catch {
-        data = {};
-      }
+    const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
 
-      const beneficiaries = normalizeLocations(data);
-    // const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
-
-          const locationResponse = await fetch(LOCATION_API_URL);
     let locations = [];
     try {
-
-        let data = {};
-        try {
-          data = await locationsResponse.json();
-        } catch {
-          data = {};
-        }
+      const locationResponse = await fetch(LOCATION_API_URL);
       if (locationResponse.ok) {
         locations = normalizeLocations(await locationResponse.json());
       }
-
     } catch {
       locations = [];
     }
@@ -1158,16 +1142,19 @@ const renderManageBeneficiaryPage = async () => {
       ...beneficiary,
       locationName: beneficiary.locationName ?? locationNameById.get(String(beneficiary.locationId)) ?? 'Unknown Location'
     }));
+
     const grouped = groupBeneficiariesByLocation(beneficiariesWithLocationName);
     const locationNames = Object.keys(grouped);
+    const hasBeneficiaries = beneficiariesWithLocationName.length > 0;
 
-    const selectedLocation = state.selectedBeneficiaryLocation && grouped[state.selectedBeneficiaryLocation]
-      ? state.selectedBeneficiaryLocation
-      : (locationNames[0] || null);
+    const selectedLocation =
+      state.selectedBeneficiaryLocation && grouped[state.selectedBeneficiaryLocation]
+        ? state.selectedBeneficiaryLocation
+        : locationNames[0] || null;
 
     state.selectedBeneficiaryLocation = selectedLocation;
 
-    const locationCards = locationNames.length
+    const locationCards = hasBeneficiaries
       ? locationNames
           .map((locationName) => {
             const isActive = locationName === selectedLocation;
@@ -1194,11 +1181,11 @@ const renderManageBeneficiaryPage = async () => {
             `;
           })
           .join('')
-      : '<div class="alert alert-info mb-0">No beneficiary found.</div>';
+      : '';
 
-    const selectedBeneficiaries = selectedLocation ? grouped[selectedLocation] || [] : [];
+    const selectedBeneficiaries = selectedLocation ? grouped[selectedLocation] ?? [] : [];
 
-    const detailsTable = selectedLocation
+    const detailsSection = hasBeneficiaries
       ? `
         <div class="beneficiary-detail-wrap">
           <div class="d-flex justify-content-between align-items-center px-3 px-md-4 py-3 border-bottom">
@@ -1217,26 +1204,24 @@ const renderManageBeneficiaryPage = async () => {
                 </tr>
               </thead>
               <tbody>
-                ${selectedBeneficiaries.length
-                  ? selectedBeneficiaries
-                      .map(
-                        (item, index) => `
-                          <tr>
-                            <td>${index + 1}</td>
-                            <td>${displayValue(item.beneficiaryName)}</td>
-                            <td>${displayValue(item.fatherName)}</td>
-                            <td>${displayValue(item.contact)}</td>
-                            <td>
-                              <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-outline-primary btn-sm" data-action="update-beneficiary" data-beneficiary-id="${item.id}" data-location-name="${selectedLocation.replaceAll('"', '&quot;')}">Update</button>
-                                <button class="btn btn-outline-danger btn-sm" data-action="delete-beneficiary" data-beneficiary-id="${item.id}" data-location-name="${selectedLocation.replaceAll('"', '&quot;')}">Delete</button>
-                              </div>
-                            </td>
-                          </tr>
-                        `
-                      )
-                      .join('')
-                  : '<tr><td colspan="5" class="text-center text-muted py-4">No beneficiaries found for this location.</td></tr>'}
+                ${selectedBeneficiaries
+                  .map(
+                    (item, index) => `
+                      <tr>
+                        <td>${index + 1}</td>
+                        <td>${displayValue(item.beneficiaryName)}</td>
+                        <td>${displayValue(item.fatherName)}</td>
+                        <td>${displayValue(item.contact)}</td>
+                        <td>
+                          <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary btn-sm" data-action="update-beneficiary" data-beneficiary-id="${item.id}" data-location-name="${selectedLocation.replaceAll('"', '&quot;')}">Update</button>
+                            <button class="btn btn-outline-danger btn-sm" data-action="delete-beneficiary" data-beneficiary-id="${item.id}" data-location-name="${selectedLocation.replaceAll('"', '&quot;')}">Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `
+                  )
+                  .join('')}
               </tbody>
             </table>
           </div>
@@ -1246,9 +1231,9 @@ const renderManageBeneficiaryPage = async () => {
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 manage-beneficiary-shell d-flex flex-column gap-3">
-        ${flash ? `` : ''}
-        <div class="beneficiary-location-grid">${locationCards}</div>
-        ${detailsTable}
+        ${flash ? `<div class="alert alert-${flash.type} mb-0" role="alert">${flash.text}</div>` : ''}
+        ${locationCards ? `<div class="beneficiary-location-grid">${locationCards}</div>` : ''}
+        ${detailsSection}
       </section>
     `;
 
@@ -1325,6 +1310,7 @@ const renderManageBeneficiaryPage = async () => {
     elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to load beneficiaries. Please try again later.</div>';
   }
 };
+
 
 const renderRoute = async () => {
   if (!state.isAuthenticated) return;
