@@ -72,6 +72,23 @@ const displayValue = (value) => {
   return value;
 };
 
+const parseJsonIfPresent = async (response) => {
+  if (response.status === 204) {
+    return null;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+};
+
 const formatStockDate = (value) => {
   if (!value) return 'N/A';
 
@@ -120,7 +137,7 @@ const formatQuantityWithUnit = (quantity, unit) => {
 };
 
 const normalizeStockInfo = (payload) => {
-  const source = payload?.data?.stockInfos ?? payload?.data ?? payload;
+  const source = payload?.data?.stockInfos ?? payload?.data?.stocks ?? payload?.stockInfos ?? payload?.stocks ?? payload?.data ?? payload;
 
   if (Array.isArray(source)) {
     return source;
@@ -249,7 +266,7 @@ const renderStockBalanceList = async () => {
         payload = {};
       }
 
-    // const payload = await response.json();
+    const payload = await parseJsonIfPresent(response);
 
     const stocks = normalizeStockInfo(payload).sort((left, right) => {
       const leftDate = new Date(getReportedDateValue(left) || 0).getTime();
@@ -1120,13 +1137,15 @@ const renderManageBeneficiaryPage = async () => {
       throw new Error(`HTTP ${beneficiaryResponse.status}`);
     }
 
-    const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
+    const beneficiaryPayload = await parseJsonIfPresent(beneficiaryResponse);
+    const beneficiaries = normalizeBeneficiaries(beneficiaryPayload);
 
     let locations = [];
     try {
       const locationResponse = await fetch(LOCATION_API_URL);
       if (locationResponse.ok) {
-        locations = normalizeLocations(await locationResponse.json());
+        const locationPayload = await parseJsonIfPresent(locationResponse);
+        locations = normalizeLocations(locationPayload);
       }
     } catch {
       locations = [];
