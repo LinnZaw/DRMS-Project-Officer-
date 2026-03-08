@@ -11,8 +11,6 @@ const state = {
   selectedDistributionGroupKey: null
 };
 
-const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
-
 const elements = {
   loginView: document.getElementById('loginView'),
   dashboardView: document.getElementById('dashboardView'),
@@ -33,9 +31,44 @@ const ASSIGN_DISTRIBUTION_API_URL = 'http://localhost:8080/api/assign-distributi
 const BENEFICIARY_API_URL = 'http://localhost:8080/api/beneficiaries';
 const DISTRIBUTION_RECORDS_API_URL = 'http://localhost:8080/api/distribution';
 const STATUS_DISTRIBUTION_RECORDS_API_URL = 'http://localhost:8080/api/distribution/status';
+const LOGIN_API_URL = 'http://localhost:8080/api/auth/login';
+const USER_ID_STORAGE_KEY = 'userId';
 
-const LOCATION_CREATOR_ID = 2;
-const PROJECT_OFFICER_ID = 2;
+const getStoredUserId = () => {
+  const rawValue = localStorage.getItem(USER_ID_STORAGE_KEY);
+  const parsedValue = Number(rawValue);
+
+  if (!rawValue || Number.isNaN(parsedValue)) {
+    return null;
+  }
+
+  return parsedValue;
+};
+
+const requireUserId = () => {
+  const userId = getStoredUserId();
+
+  if (!userId) {
+    state.isAuthenticated = false;
+    elements.loginForm.reset();
+    elements.errorMessage.textContent = 'Please log in to continue.';
+    elements.errorMessage.classList.remove('d-none');
+    window.location.hash = '#/dashboard';
+    setAuthView();
+    return null;
+  }
+
+  return userId;
+};
+
+const logout = () => {
+  localStorage.removeItem(USER_ID_STORAGE_KEY);
+  state.isAuthenticated = false;
+  elements.loginForm.reset();
+  elements.errorMessage.classList.add('d-none');
+  window.location.hash = '#/dashboard';
+  setAuthView();
+};
 
 const setAuthView = () => {
   elements.loginView.classList.toggle('d-none', state.isAuthenticated);
@@ -479,15 +512,21 @@ const showAssignLocationModal = ({ mode, users = [], location, onSuccess }) => {
       return;
     }
 
+    const currentUserId = requireUserId();
+    if (!currentUserId) {
+      return;
+    }
+
     const payload = {
       locationName: form.locationName.value.trim(),
-      staffId: Number(form.staffId.value)
+      staffId: Number(form.staffId.value),
+      creatorId: currentUserId
     };
 
     try {
       const endpoint = isEdit
         ? `${LOCATION_API_URL}/${encodeURIComponent(location.locationId)}`
-        : `${LOCATION_API_URL}/${LOCATION_CREATOR_ID}`;
+        : `${LOCATION_API_URL}/${currentUserId}`;
       const method = isEdit ? 'PATCH' : 'POST';
 
       const response = await fetch(endpoint, {
@@ -802,18 +841,24 @@ const showAssignDistributionModal = ({ mode, distribution, onSuccess }) => {
       return;
     }
 
+    const currentUserId = requireUserId();
+    if (!currentUserId) {
+      return;
+    }
+
     const payload = {
       distributionDate: new Date(form.distributionDate.value).toISOString(),
       eventType: form.eventType.value,
       status: 'Pending',
-      userId: distribution?.userId ?? PROJECT_OFFICER_ID,
+      userId: distribution?.userId ?? currentUserId,
+      projectOfficerId: currentUserId,
       locationId: Number(form.locationId.value)
     };
 
     try {
       const endpoint = isEdit
         ? `${ASSIGN_DISTRIBUTION_API_URL}/${encodeURIComponent(distribution?.id)}`
-        : `${ASSIGN_DISTRIBUTION_API_URL}?userId=${encodeURIComponent(PROJECT_OFFICER_ID)}`;
+        : `${ASSIGN_DISTRIBUTION_API_URL}?userId=${encodeURIComponent(currentUserId)}`;
       const method = isEdit ? 'PATCH' : 'POST';
 
       const response = await fetch(endpoint, {
@@ -1339,7 +1384,7 @@ const renderManageBeneficiaryPage = async () => {
 
 
 const normalizeDistributionRecords = (payload) => {
-  const source = payload?.data?.distributions ?? payload?.data?.distributionRecords ?? payload?.data ?? payload;
+  const source = payload?.data?.distributionRecords ?? [];
 
   if (!Array.isArray(source)) {
     return [];
@@ -1351,16 +1396,20 @@ const normalizeDistributionRecords = (payload) => {
     locationName: item.locationName ?? item.location?.locationName ?? item.location?.name ?? 'Unknown Location',
     fieldStaffName: item.user?.email ?? item.user?.name ?? item.user?.userName ?? item.staffName ?? item.userName ?? 'N/A',
     beneficiaryName: item.beneficiary?.beneficName ?? item.beneficiary?.beneficiaryName ?? item.beneficiaryName ?? item.beneficName,
-    nrc: item.beneficiary?.nrc ?? item.beneficiary?.nrcNo ?? item.nrc,
+    houseHoldNrc: item.houseHoldNrc ?? item.beneficiary?.houseHoldNrc ?? item.beneficiary?.nrc ?? item.beneficiary?.nrcNo,
     familyMembers: item.familyMembers ?? item.familyMember ?? item.beneficiary?.familyMembers,
     underFive: item.underFive ?? item.underfive ?? item.beneficiary?.underFive,
     disabled: item.disabled ?? item.disability ?? item.beneficiary?.disabled,
-    distributedItems: item.distributedItems ?? item.items ?? [],
+    distributedItems: item.distributedItems ?? [],
     status: item.status ?? 'Pending'
   }));
 };
 
 const formatDistributedItems = (items) => {
+  if (typeof items === 'string') {
+    return items.trim() || 'N/A';
+  }
+
   if (!Array.isArray(items) || !items.length) {
     return 'N/A';
   }
@@ -1492,7 +1541,7 @@ const renderConfirmDistributionRecordsPage = async () => {
                       <tr>
                         <td>${index + 1}</td>
                         <td>${displayValue(record.beneficiaryName)}</td>
-                        <td>${displayValue(record.nrc)}</td>
+                        <td>${displayValue(record.houseHoldNrc)}</td>
                         <td>${displayValue(record.familyMembers)}</td>
                         <td>${displayValue(record.underFive)}</td>
                         <td>${displayValue(record.disabled)}</td>
@@ -1600,8 +1649,10 @@ const renderConfirmDistributionRecordsPage = async () => {
 
 
 const renderRoute = async () => {
-  if (!state.isAuthenticated) return;
+  const currentUserId = requireUserId();
+  if (!currentUserId) return;
 
+  state.isAuthenticated = true;
   const { mainRoute } = parseRoute();
   setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' || mainRoute === 'assign-distribution' || mainRoute === 'manage-beneficiary' || mainRoute === 'confirm-distribution-records' ? mainRoute : 'dashboard');
 
@@ -1633,12 +1684,47 @@ const renderRoute = async () => {
   renderDashboardOverview();
 };
 
-elements.loginForm.addEventListener('submit', (event) => {
+const extractUserIdFromLoginPayload = (payload) => {
+  const candidate =
+    payload?.data?.userId ??
+    payload?.data?.id ??
+    payload?.userId ??
+    payload?.id ??
+    payload?.user?.userId ??
+    payload?.user?.id ??
+    null;
+
+  const parsedValue = Number(candidate);
+  return Number.isNaN(parsedValue) ? null : parsedValue;
+};
+
+elements.loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
 
-  if (email === demoCredentials.email && password === demoCredentials.password) {
+  try {
+    const response = await fetch(LOGIN_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const payload = await parseJsonIfPresent(response);
+
+    if (!response.ok) {
+      throw new Error(payload?.message || 'Invalid email or password.');
+    }
+
+    const userId = extractUserIdFromLoginPayload(payload);
+
+    if (!userId) {
+      throw new Error('Login succeeded but no userId was returned by the server.');
+    }
+
+    localStorage.setItem(USER_ID_STORAGE_KEY, String(userId));
     state.isAuthenticated = true;
     elements.errorMessage.classList.add('d-none');
     setAuthView();
@@ -1647,21 +1733,27 @@ elements.loginForm.addEventListener('submit', (event) => {
       window.location.hash = '#/dashboard';
     }
 
-    renderRoute();
-    return;
+    await renderRoute();
+  } catch (error) {
+    elements.errorMessage.textContent = error.message || 'Unable to login. Please try again.';
+    elements.errorMessage.classList.remove('d-none');
   }
-
-  elements.errorMessage.textContent = 'Invalid email or password. Try officer@drms.org / password123';
-  elements.errorMessage.classList.remove('d-none');
 });
 
 elements.logoutBtn.addEventListener('click', () => {
-  state.isAuthenticated = false;
-  elements.loginForm.reset();
-  window.location.hash = '#/dashboard';
-  setAuthView();
+  logout();
 });
 
 window.addEventListener('hashchange', renderRoute);
 
+state.isAuthenticated = Boolean(getStoredUserId());
+
+if (!state.isAuthenticated) {
+  window.location.hash = '#/dashboard';
+}
+
 setAuthView();
+
+if (state.isAuthenticated) {
+  renderRoute();
+}
