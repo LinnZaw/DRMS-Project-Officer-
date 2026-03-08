@@ -6,7 +6,9 @@ const state = {
   fieldStaffRoleId: null,
   assignDistributionFlash: null,
   manageBeneficiaryFlash: null,
-  selectedBeneficiaryLocation: null
+  selectedBeneficiaryLocation: null,
+  confirmDistributionFlash: null,
+  selectedDistributionGroupKey: null
 };
 
 const demoCredentials = { email: 'officer@drms.org', password: 'password123' };
@@ -29,6 +31,7 @@ const USER_API_URL = 'http://localhost:8080/api/users';
 const ROLE_API_URL = 'http://localhost:8080/api/roles';
 const ASSIGN_DISTRIBUTION_API_URL = 'http://localhost:8080/api/assign-distributions';
 const BENEFICIARY_API_URL = 'http://localhost:8080/api/beneficiaries';
+const DISTRIBUTION_RECORDS_API_URL = 'http://localhost:8080/api/distribution';
 const LOCATION_CREATOR_ID = 2;
 const PROJECT_OFFICER_ID = 2;
 
@@ -267,14 +270,6 @@ const renderStockBalanceList = async () => {
   renderStockBalanceContent('info', 'Loading stock data...');
 
 const response = await fetch(STOCK_API_URL);
-
-  try {
-    // let payload = {};
-    //   try {
-    //     payload = await response.json();
-    //   } catch {
-    //     payload = {};
-    //   }
 
     const payload = await parseJsonIfPresent(response);
     const stocks = getSortedStocks(payload);
@@ -1340,11 +1335,272 @@ const renderManageBeneficiaryPage = async () => {
 };
 
 
+const normalizeDistributionRecords = (payload) => {
+  const source = payload?.data?.distributions ?? payload?.data?.distributionRecords ?? payload?.data ?? payload;
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((item, index) => ({
+    id: item.id ?? item.distributionId ?? index,
+    distributionDate: item.distributionDate,
+    locationName: item.locationName ?? item.location?.locationName ?? item.location?.name ?? 'Unknown Location',
+    fieldStaffName: item.user?.email ?? item.user?.name ?? item.user?.userName ?? item.staffName ?? item.userName ?? 'N/A',
+    beneficiaryName: item.beneficiary?.beneficName ?? item.beneficiary?.beneficiaryName ?? item.beneficiaryName ?? item.beneficName,
+    nrc: item.beneficiary?.nrc ?? item.beneficiary?.nrcNo ?? item.nrc,
+    familyMembers: item.familyMembers ?? item.familyMember ?? item.beneficiary?.familyMembers,
+    underFive: item.underFive ?? item.underfive ?? item.beneficiary?.underFive,
+    disabled: item.disabled ?? item.disability ?? item.beneficiary?.disabled,
+    distributedItems: item.distributedItems ?? item.items ?? [],
+    status: item.status ?? 'Pending'
+  }));
+};
+
+const formatDistributedItems = (items) => {
+  if (!Array.isArray(items) || !items.length) {
+    return 'N/A';
+  }
+
+  return items
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object') {
+        const name = item.itemName ?? item.name ?? item.type ?? 'Item';
+        const quantity = item.quantity ?? item.qty;
+        const unit = item.unit ?? item.unitOfMeasure;
+        if (quantity !== undefined && quantity !== null) {
+          return `${name} (${quantity}${unit ? ` ${unit}` : ''})`;
+        }
+        return name;
+      }
+      return String(item);
+    })
+    .join(', ');
+};
+
+const groupDistributionRecords = (records) => {
+  const grouped = records.reduce((acc, record) => {
+    const key = `${record.locationName}__${record.distributionDate || 'N/A'}`;
+    if (!acc[key]) {
+      acc[key] = {
+        key,
+        locationName: record.locationName,
+        distributionDate: record.distributionDate,
+        fieldStaffName: record.fieldStaffName,
+        records: []
+      };
+    }
+
+    acc[key].records.push(record);
+    return acc;
+  }, {});
+
+  return Object.values(grouped).sort((a, b) => {
+    const aDate = new Date(a.distributionDate || 0).getTime();
+    const bDate = new Date(b.distributionDate || 0).getTime();
+    return bDate - aDate;
+  });
+};
+
+const renderConfirmDistributionRecordsPage = async () => {
+  elements.pageTitle.textContent = 'Confirm Distribution Records';
+  elements.pageSubtitle.textContent = 'Review and confirm field distribution records grouped by location and date.';
+
+  const flash = state.confirmDistributionFlash;
+  state.confirmDistributionFlash = null;
+
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading distribution records...</div>';
+
+  try {
+    const response = await fetch(DISTRIBUTION_RECORDS_API_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = await parseJsonIfPresent(response);
+    const records = normalizeDistributionRecords(payload);
+    const groups = groupDistributionRecords(records);
+
+    const selectedGroup =
+      groups.find((group) => group.key === state.selectedDistributionGroupKey) ?? groups[0] ?? null;
+
+    state.selectedDistributionGroupKey = selectedGroup?.key ?? null;
+
+    const cardsHtml = groups.length
+      ? groups
+          .map((group) => {
+            const isActive = selectedGroup?.key === group.key;
+            return `
+              <article
+                class="distribution-record-card ${isActive ? 'active' : ''}"
+                role="button"
+                tabindex="0"
+                data-group-key="${group.key.replaceAll('"', '&quot;')}"
+                aria-pressed="${isActive ? 'true' : 'false'}"
+              >
+                <div class="d-flex flex-column gap-1">
+                  <h6 class="mb-0 theme-text">${displayValue(group.locationName)}</h6>
+                  <p class="mb-0 small text-muted"><strong>Field Staff:</strong> ${displayValue(group.fieldStaffName)}</p>
+                  <p class="mb-0 small text-muted"><strong>Distribution Date:</strong> ${formatStockDateTime(group.distributionDate)}</p>
+                  <p class="mb-0 small text-muted"><strong>Beneficiaries:</strong> ${group.records.length}</p>
+                </div>
+              </article>
+            `;
+          })
+          .join('')
+      : '<div class="alert alert-info mb-0">No distribution records found.</div>';
+
+    const detailsHtml = selectedGroup
+      ? `
+        <div class="distribution-record-detail-wrap">
+          <div class="d-flex justify-content-between align-items-center px-3 px-md-4 py-3 border-bottom">
+            <h6 class="mb-0">${displayValue(selectedGroup.locationName)} - ${formatStockDateTime(selectedGroup.distributionDate)}</h6>
+            <span class="badge text-bg-primary">${selectedGroup.records.length}</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 distribution-record-table">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">No.</th>
+                  <th scope="col">Beneficiary Name</th>
+                  <th scope="col">NRC</th>
+                  <th scope="col">Family Members</th>
+                  <th scope="col">Under Five</th>
+                  <th scope="col">Disabled</th>
+                  <th scope="col">Distributed Items</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${selectedGroup.records
+                  .map((record, index) => {
+                    const normalizedStatus = String(record.status || 'Pending');
+                    const isPending = normalizedStatus.toLowerCase() === 'pending';
+                    const statusBadgeClass =
+                      normalizedStatus.toLowerCase() === 'approved'
+                        ? 'text-bg-success'
+                        : normalizedStatus.toLowerCase() === 'denied'
+                          ? 'text-bg-danger'
+                          : 'text-bg-warning';
+
+                    return `
+                      <tr>
+                        <td>${index + 1}</td>
+                        <td>${displayValue(record.beneficiaryName)}</td>
+                        <td>${displayValue(record.nrc)}</td>
+                        <td>${displayValue(record.familyMembers)}</td>
+                        <td>${displayValue(record.underFive)}</td>
+                        <td>${displayValue(record.disabled)}</td>
+                        <td>${formatDistributedItems(record.distributedItems)}</td>
+                        <td><span class="badge ${statusBadgeClass}">${normalizedStatus}</span></td>
+                        <td>
+                          ${isPending
+                            ? `<div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-outline-success btn-sm" data-action="approve-distribution-record" data-record-id="${record.id}">Approve</button>
+                                <button class="btn btn-outline-danger btn-sm" data-action="deny-distribution-record" data-record-id="${record.id}">Deny</button>
+                              </div>`
+                            : '<span class="text-muted small">No actions</span>'}
+                        </td>
+                      </tr>
+                    `;
+                  })
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `
+      : '<div class="alert alert-info mb-0">No distribution records found.</div>';
+
+    elements.contentHost.innerHTML = `
+      <section class="fixed-page-shell mx-auto w-100 confirm-distribution-shell d-flex flex-column gap-3">
+        ${flash ? `<div class="alert alert-${flash.type} mb-0" role="alert">${flash.text}</div>` : ''}
+        <div class="distribution-record-grid">${cardsHtml}</div>
+        ${detailsHtml}
+      </section>
+    `;
+
+    const rerender = async () => {
+      await renderConfirmDistributionRecordsPage();
+    };
+
+    const selectGroup = (groupKey) => {
+      const exists = groups.some((group) => group.key === groupKey);
+      if (!exists) return;
+      state.selectedDistributionGroupKey = groupKey;
+      rerender();
+    };
+
+    elements.contentHost.querySelectorAll('.distribution-record-card').forEach((card) => {
+      card.addEventListener('click', () => selectGroup(card.dataset.groupKey));
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          selectGroup(card.dataset.groupKey);
+        }
+      });
+    });
+
+    const patchStatus = async (recordId, status) => {
+      try {
+        const patchResponse = await fetch(`${DISTRIBUTION_RECORDS_API_URL}/${encodeURIComponent(recordId)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status })
+        });
+
+        if (!patchResponse.ok) {
+          let message = `Failed to ${status.toLowerCase()} record.`;
+          try {
+            const errorPayload = await parseJsonIfPresent(patchResponse);
+            message = errorPayload?.message ?? message;
+          } catch {
+            // noop
+          }
+          throw new Error(message);
+        }
+
+        state.confirmDistributionFlash = {
+          type: 'success',
+          text: `Record ${status.toLowerCase()} successfully.`
+        };
+        await rerender();
+      } catch (error) {
+        state.confirmDistributionFlash = {
+          type: 'danger',
+          text: error.message || `Failed to ${status.toLowerCase()} record.`
+        };
+        await rerender();
+      }
+    };
+
+    elements.contentHost.querySelectorAll('[data-action="approve-distribution-record"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        patchStatus(button.dataset.recordId, 'Approved');
+      });
+    });
+
+    elements.contentHost.querySelectorAll('[data-action="deny-distribution-record"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        patchStatus(button.dataset.recordId, 'Denied');
+      });
+    });
+  } catch {
+    elements.contentHost.innerHTML = '<div class="alert alert-danger">Unable to load distribution records. Please try again later.</div>';
+  }
+};
+
+
+
 const renderRoute = async () => {
   if (!state.isAuthenticated) return;
 
   const { mainRoute } = parseRoute();
-  setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' || mainRoute === 'assign-distribution' || mainRoute === 'manage-beneficiary' ? mainRoute : 'dashboard');
+  setActiveNav(mainRoute === 'stock-balance' || mainRoute === 'assign-location' || mainRoute === 'assign-distribution' || mainRoute === 'manage-beneficiary' || mainRoute === 'confirm-distribution-records' ? mainRoute : 'dashboard');
 
   if (mainRoute === 'stock-balance') {
     await renderStockBalanceList();
@@ -1363,6 +1619,11 @@ const renderRoute = async () => {
 
   if (mainRoute === 'manage-beneficiary') {
     await renderManageBeneficiaryPage();
+    return;
+  }
+
+  if (mainRoute === 'confirm-distribution-records') {
+    await renderConfirmDistributionRecordsPage();
     return;
   }
 
