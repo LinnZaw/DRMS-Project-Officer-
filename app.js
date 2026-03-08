@@ -146,10 +146,11 @@ const renderStockBalanceContent = (messageType, messageText, bodyHtml = '') => {
 
   const alertClass = alertClassMap[messageType] || 'alert-info';
 
+  //for test 
+  //       <div class="stock-list-scroll">${bodyHtml}</div>
   elements.contentHost.innerHTML = `
     <section class="fixed-page-shell mx-auto d-flex flex-column gap-3">
       <div class="alert ${alertClass} mb-0" role="alert">${messageText}</div>
-      <div class="stock-list-scroll">${bodyHtml}</div>
     </section>
   `;
 };
@@ -239,13 +240,16 @@ const renderStockBalanceList = async () => {
   elements.pageSubtitle.textContent = 'Stock balance records sorted by latest reported date.';
   renderStockBalanceContent('info', 'Loading stock data...');
 
-  try {
-    const response = await fetch(STOCK_API_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
 
-    const payload = await response.json();
+  try {
+    let payload = {};
+      try {
+        payload = await response.json();
+      } catch {
+        payload = {};
+      }
+
+    // const payload = await response.json();
 
     const stocks = normalizeStockInfo(payload).sort((left, right) => {
       const leftDate = new Date(getReportedDateValue(left) || 0).getTime();
@@ -505,11 +509,20 @@ const renderAssignLocationPage = async () => {
   try {
     const locationsResponse = await fetch(LOCATION_API_URL);
 
-    if (!locationsResponse.ok) {
-      throw new Error('request_failed');
-    }
+    // if (!locationsResponse.ok) {
+    //   throw new Error('request_failed');
+    // }
 
-    const locations = normalizeLocations(await locationsResponse.json());
+      let data = {};
+      try {
+        data = await locationsResponse.json();
+      } catch {
+        data = {};
+      }
+
+      const locations = normalizeLocations(data);
+
+    // const locations = normalizeLocations(await locationsResponse.json());
 
     const tableRows = locations.length
       ? locations
@@ -1103,18 +1116,34 @@ const renderManageBeneficiaryPage = async () => {
   try {
     const beneficiaryResponse = await fetch(BENEFICIARY_API_URL);
 
-    if (!beneficiaryResponse.ok) {
-      throw new Error(`HTTP ${beneficiaryResponse.status}`);
-    }
+    // if (!beneficiaryResponse.ok) {
+    //   throw new Error(`HTTP ${beneficiaryResponse.status}`);
+    // }
 
-    const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
+      let data = {};
+      try {
+        data = await beneficiaryResponse.json();
+      } catch {
+        data = {};
+      }
 
+      const beneficiaries = normalizeLocations(data);
+    // const beneficiaries = normalizeBeneficiaries(await beneficiaryResponse.json());
+
+          const locationResponse = await fetch(LOCATION_API_URL);
     let locations = [];
     try {
-      const locationResponse = await fetch(LOCATION_API_URL);
+
+        let data = {};
+        try {
+          data = await locationsResponse.json();
+        } catch {
+          data = {};
+        }
       if (locationResponse.ok) {
         locations = normalizeLocations(await locationResponse.json());
       }
+
     } catch {
       locations = [];
     }
@@ -1217,7 +1246,7 @@ const renderManageBeneficiaryPage = async () => {
 
     elements.contentHost.innerHTML = `
       <section class="fixed-page-shell mx-auto w-100 manage-beneficiary-shell d-flex flex-column gap-3">
-        ${flash ? `<div class="alert alert-${flash.type} mb-0" role="alert">${flash.text}</div>` : ''}
+        ${flash ? `` : ''}
         <div class="beneficiary-location-grid">${locationCards}</div>
         ${detailsTable}
       </section>
