@@ -373,3 +373,25 @@ select,
 .distribution-record-table th {
   padding: 0.95rem 1rem;
 }
+
+
+.dashboard-shell {
+  max-width: 1100px;
+}
+
+.dashboard-welcome-card {
+  border-left: 5px solid var(--drms-primary);
+}
+
+.dashboard-stat-card,
+.dashboard-actions-card {
+  background: #fff;
+  border: 1px solid #d3dff5;
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(53, 90, 149, 0.08);
+}
+
+.dashboard-stat-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}

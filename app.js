@@ -91,14 +91,105 @@ const parseRoute = () => {
   };
 };
 
-const renderDashboardOverview = () => {
-  elements.pageTitle.textContent = 'Dashboard';
-  elements.pageSubtitle.textContent = 'Overview of disaster relief operations.';
+const renderDashboardOverview = async () => {
+  elements.pageTitle.textContent = 'Project Officer Dashboard';
+  elements.pageSubtitle.textContent = 'Manage relief operations with complete visibility and accountability.';
+  elements.contentHost.innerHTML = '<div class="text-muted">Loading dashboard insights...</div>';
+
+  let totalDistributionRecords = 0;
+  let approvedDistributions = 0;
+  let pendingOrDeniedRequests = 0;
+  let totalBeneficiaries = 0;
+
+  try {
+    const [distributionResponse, beneficiariesResponse] = await Promise.all([
+      fetch(DISTRIBUTION_RECORDS_API_URL),
+      fetch(BENEFICIARY_API_URL)
+    ]);
+
+    if (distributionResponse.ok) {
+      const distributionPayload = await parseJsonIfPresent(distributionResponse);
+      const distributionRecords = normalizeDistributionRecords(distributionPayload);
+      totalDistributionRecords = distributionRecords.length;
+      approvedDistributions = distributionRecords.filter((record) => String(record.status).toLowerCase() === 'approved').length;
+      pendingOrDeniedRequests = distributionRecords.filter((record) => {
+        const status = String(record.status).toLowerCase();
+        return status === 'pending' || status === 'denied';
+      }).length;
+    }
+
+    if (beneficiariesResponse.ok) {
+      const beneficiariesPayload = await parseJsonIfPresent(beneficiariesResponse);
+      totalBeneficiaries = normalizeBeneficiaries(beneficiariesPayload).length;
+    }
+  } catch {
+    // Show dashboard even if stats calls fail.
+  }
+
+  const stats = [
+    {
+      title: 'Total Distribution Records',
+      value: totalDistributionRecords,
+      icon: '📦'
+    },
+    {
+      title: 'Total Beneficiaries',
+      value: totalBeneficiaries,
+      icon: '👨‍👩‍👧‍👦'
+    },
+    {
+      title: 'Approved Distributions',
+      value: approvedDistributions,
+      icon: '✅'
+    },
+    {
+      title: 'Pending or Denied Requests',
+      value: pendingOrDeniedRequests,
+      icon: '⏳'
+    }
+  ];
+
   elements.contentHost.innerHTML = `
-    <article class="organization-card p-4 p-md-5">
-      <p class="text-uppercase text-muted small mb-2">Organization Name</p>
-      <h4 class="theme-text fw-semibold mb-0">Disaster Relief Management Organization</h4>
-    </article>
+    <section class="dashboard-shell mx-auto d-grid gap-4">
+      <article class="organization-card dashboard-welcome-card p-4 p-md-5">
+        <p class="text-uppercase text-muted small mb-2">Welcome</p>
+        <h4 class="theme-text fw-semibold mb-3">Project Officer Dashboard</h4>
+        <p class="mb-0 text-muted">
+          Disaster Relief Management System (DRMS) supports NGO teams in coordinating disaster relief distribution,
+          tracking beneficiary support, and maintaining transparent, accountable aid delivery from stock to community.
+        </p>
+      </article>
+
+      <section>
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h5 class="mb-0 theme-text">Summary Statistics</h5>
+        </div>
+        <div class="row g-3">
+          ${stats
+            .map(
+              (stat) => `
+                <div class="col-12 col-sm-6 col-xl-3">
+                  <article class="dashboard-stat-card h-100 p-3 p-md-4">
+                    <p class="dashboard-stat-icon mb-2" aria-hidden="true">${stat.icon}</p>
+                    <p class="small text-muted mb-1">${stat.title}</p>
+                    <h3 class="mb-0 theme-text fw-semibold">${stat.value}</h3>
+                  </article>
+                </div>
+              `
+            )
+            .join('')}
+        </div>
+      </section>
+
+      <section>
+        <h5 class="mb-3 theme-text">Quick Actions</h5>
+        <div class="dashboard-actions-card p-3 p-md-4 d-grid gap-2">
+          <a class="btn btn-theme text-start" href="#/confirm-distribution-records">Distribution Records</a>
+          <a class="btn btn-outline-primary text-start" href="#/stock-balance">Stock Balance Report</a>
+          <a class="btn btn-outline-primary text-start" href="#/manage-beneficiary">Beneficiary Management</a>
+        </div>
+      </section>
+    </section>
   `;
 };
 
@@ -1681,7 +1772,7 @@ const renderRoute = async () => {
     return;
   }
 
-  renderDashboardOverview();
+  await renderDashboardOverview();
 };
 
 const extractUserIdFromLoginPayload = (payload) => {
